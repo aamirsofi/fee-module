@@ -63,7 +63,7 @@ Should return:
 {
   "status": "ok",
   "timestamp": "...",
-  "service": "Fee Management System API",
+  "service": "School ERP Platform API",
   "version": "1.0.0"
 }
 ```

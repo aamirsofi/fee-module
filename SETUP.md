@@ -1,6 +1,6 @@
 # Setup Guide - Step by Step
 
-Follow these steps to get your Fee Management System up and running:
+Follow these steps to get your School ERP Platform up and running:
 
 ## Step 1: Install Dependencies
 
