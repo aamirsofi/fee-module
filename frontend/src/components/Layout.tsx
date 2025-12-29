@@ -154,22 +154,26 @@ export default function Layout({ children }: LayoutProps) {
     setSidebarOpen(isSuperAdmin);
   }, [isSuperAdmin]);
 
-  // Auto-expand sections that have active children
+  // Auto-expand only the active section, collapse all others
   useEffect(() => {
     if (isSuperAdmin) {
+      const newExpandedSections: Record<string, boolean> = {};
+      
       superAdminSections.forEach((section) => {
         if (section.section && section.children) {
           const hasActive = section.children.some((child) =>
             isActive(child.path)
           );
-          if (hasActive && !expandedSections[section.section]) {
-            setExpandedSections((prev) => ({
-              ...prev,
-              [section.section!]: true,
-            }));
-          }
+          // Only expand the section that has an active child, collapse all others
+          newExpandedSections[section.section] = hasActive;
         }
       });
+      
+      // Update all sections at once - collapse inactive ones, expand active one
+      setExpandedSections((prev) => ({
+        ...prev,
+        ...newExpandedSections,
+      }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, isSuperAdmin]);
@@ -274,12 +278,12 @@ export default function Layout({ children }: LayoutProps) {
                     to={section.path!}
                     className={`${
                       isDashboardActive
-                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg border-l-4 border-white/50"
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg"
                         : "text-gray-700 hover:bg-gray-100"
                     } flex items-center px-3 py-2 rounded-lg transition-smooth text-sm relative`}
                   >
                     {isDashboardActive && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 rounded-r-full" />
+                      <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-white/80 rounded-r-full" />
                     )}
                     <Icon className="w-4 h-4 flex-shrink-0" />
                     {sidebarOpen && (
@@ -298,12 +302,12 @@ export default function Layout({ children }: LayoutProps) {
                     }
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-smooth text-sm relative ${
                       hasActiveChild
-                        ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border-l-4 border-indigo-500 font-semibold"
+                        ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 font-semibold"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
                   >
                     {hasActiveChild && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r-full" />
+                      <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
                     )}
                     <div className="flex items-center">
                       <Icon
@@ -339,12 +343,12 @@ export default function Layout({ children }: LayoutProps) {
                             to={child.path}
                             className={`${
                               isChildActive
-                                ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 font-semibold border-l-4 border-indigo-500 shadow-sm"
+                                ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 font-semibold shadow-sm"
                                 : "text-gray-600 hover:bg-gray-50"
                             } flex items-center px-3 py-1.5 rounded-md transition-smooth text-xs relative`}
                           >
                             {isChildActive && (
-                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r-full" />
+                              <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
                             )}
                             <ChildIcon
                               className={`w-3.5 h-3.5 mr-2 ${
