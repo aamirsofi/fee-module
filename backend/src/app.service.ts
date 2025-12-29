@@ -6,7 +6,7 @@ export class AppService {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'Fee Management System API',
+      service: 'School ERP Platform API',
       version: '1.0.0',
     };
   }

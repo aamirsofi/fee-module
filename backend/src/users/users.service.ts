@@ -19,7 +19,16 @@ export class UsersService {
 
   async findAll(): Promise<User[]> {
     return await this.usersRepository.find({
-      select: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
+      select: ['id', 'name', 'email', 'role', 'schoolId', 'createdAt', 'updatedAt'],
+      order: { createdAt: 'desc' },
+    });
+  }
+
+  async findBySchool(schoolId: number): Promise<User[]> {
+    return await this.usersRepository.find({
+      where: { schoolId },
+      select: ['id', 'name', 'email', 'role', 'schoolId', 'createdAt', 'updatedAt'],
+      order: { createdAt: 'desc' },
     });
   }
 

@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Follow these commands in order to get your Fee Management System running.
+Follow these commands in order to get your School ERP Platform running.
 
 ## Prerequisites
 

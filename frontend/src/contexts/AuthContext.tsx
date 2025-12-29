@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '../services/auth.service';
+import { schoolsService } from '../services/schools.service';
 import { User, LoginCredentials } from '../types';
 
 interface AuthContextType {
@@ -37,9 +38,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const userData = await authService.getCurrentUser();
           setUser(userData);
+          
+          // If user has a schoolId but no subdomain is set, fetch it
+          if (userData.schoolId && !localStorage.getItem('school_subdomain')) {
+            try {
+              const school = await schoolsService.getById(userData.schoolId);
+              if (school && school.subdomain) {
+                localStorage.setItem('school_subdomain', school.subdomain);
+              }
+            } catch (error) {
+              console.warn('Failed to fetch school subdomain:', error);
+            }
+          }
         } catch (error) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('user');
+          localStorage.removeItem('school_subdomain');
         }
       }
       setLoading(false);
@@ -53,10 +67,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem('access_token', response.access_token);
     localStorage.setItem('user', JSON.stringify(response.user));
     setUser(response.user);
+    
+    // If user has a schoolId, fetch the school and set subdomain in localStorage
+    if (response.user.schoolId) {
+      try {
+        const school = await schoolsService.getById(response.user.schoolId);
+        if (school && school.subdomain) {
+          localStorage.setItem('school_subdomain', school.subdomain);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch school subdomain:', error);
+        // Don't fail login if school fetch fails
+      }
+    }
   };
 
   const logout = () => {
     authService.logout();
+    localStorage.removeItem('school_subdomain');
     setUser(null);
   };
 

@@ -1,6 +1,6 @@
-# Fee Management System
+# School ERP Platform
 
-A full-stack school fee management system built with **NestJS** (backend) and **React** (frontend).
+A full-stack multi-school ERP management system built with **NestJS** (backend) and **React** (frontend).
 
 ## Tech Stack
 

@@ -29,8 +29,8 @@ async function bootstrap() {
 
   // Swagger API Documentation
   const config = new DocumentBuilder()
-    .setTitle('Fee Management System API')
-    .setDescription('RESTful API for School Fee Management System')
+    .setTitle('School ERP Platform API')
+    .setDescription('RESTful API for Multi-School ERP Management System')
     .setVersion('1.0')
     .addBearerAuth(
       {

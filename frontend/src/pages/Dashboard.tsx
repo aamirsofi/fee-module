@@ -204,7 +204,7 @@ export default function Dashboard() {
       default:
         return (
           <div className="text-center py-12 card-modern rounded-2xl shadow-lg">
-            <p className="text-gray-600">Welcome to Fee Management System</p>
+            <p className="text-gray-600">Welcome to School ERP Platform</p>
           </div>
         );
     }

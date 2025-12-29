@@ -198,7 +198,7 @@ Expected response:
 {
   "status": "ok",
   "timestamp": "...",
-  "service": "Fee Management System API"
+  "service": "School ERP Platform API"
 }
 ```
 

@@ -1,7 +1,7 @@
 {
   "name": "fee-management-backend",
   "version": "1.0.0",
-  "description": "Fee Management System Backend API",
+  "description": "School ERP Platform Backend API",
   "author": "",
   "private": true,
   "license": "MIT",
@@ -24,6 +24,7 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "create:admin": "ts-node -r tsconfig-paths/register src/scripts/create-admin.ts",
     "create:school": "ts-node -r tsconfig-paths/register src/scripts/create-test-school.ts",
+    "create:user": "ts-node -r tsconfig-paths/register src/scripts/create-test-user.ts",
     "setup:admin": "npm run create:admin && npm run create:school && npm run assign:school",
     "assign:school": "ts-node -r tsconfig-paths/register src/scripts/assign-school-to-admin.ts"
   },

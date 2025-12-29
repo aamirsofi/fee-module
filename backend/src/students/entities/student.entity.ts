@@ -29,7 +29,7 @@ export class Student {
   @Column({ nullable: true })
   userId?: number;
 
-  @Column({ unique: true, length: 255 })
+  @Column({ length: 255 })
   studentId!: string;
 
   @Column({ length: 255 })
@@ -38,7 +38,7 @@ export class Student {
   @Column({ length: 255 })
   lastName!: string;
 
-  @Column({ unique: true, length: 255 })
+  @Column({ length: 255 })
   email!: string;
 
   @Column({ nullable: true, length: 255 })

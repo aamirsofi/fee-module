@@ -30,11 +30,15 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   const navigation = [
-    { name: 'Dashboard', path: '/dashboard', icon: FiHome, roles: ['super_admin', 'administrator', 'accountant'] },
-    { name: 'Students', path: '/students', icon: FiUsers, roles: ['super_admin', 'administrator'] },
-    { name: 'Fee Structures', path: '/fee-structures', icon: FiDollarSign, roles: ['super_admin', 'administrator'] },
-    { name: 'Payments', path: '/payments', icon: FiCreditCard, roles: ['super_admin', 'administrator', 'accountant'] },
-    { name: 'Schools', path: '/schools', icon: FiMapPin, roles: ['super_admin'] },
+    // Super Admin Navigation
+    { name: 'Dashboard', path: '/super-admin/dashboard', icon: FiHome, roles: ['super_admin'] },
+    { name: 'Schools', path: '/super-admin/schools', icon: FiMapPin, roles: ['super_admin'] },
+    { name: 'Users', path: '/super-admin/users', icon: FiUser, roles: ['super_admin'] },
+    // School Admin Navigation
+    { name: 'Dashboard', path: '/dashboard', icon: FiHome, roles: ['administrator', 'accountant'] },
+    { name: 'Students', path: '/students', icon: FiUsers, roles: ['administrator'] },
+    { name: 'Fee Structures', path: '/fee-structures', icon: FiDollarSign, roles: ['administrator'] },
+    { name: 'Payments', path: '/payments', icon: FiCreditCard, roles: ['administrator', 'accountant'] },
   ];
 
   const filteredNavigation = navigation.filter((item) =>
@@ -53,7 +57,7 @@ export default function Layout({ children }: LayoutProps) {
                     <FiDollarSign className="w-5 h-5 text-white" />
                   </div>
                   <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                    Fee Management
+                    School ERP Platform
                   </h1>
                 </div>
               </div>
