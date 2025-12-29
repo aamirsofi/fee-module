@@ -28,12 +28,12 @@ export default function SuperAdminSchools() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
 
   useEffect(() => {
     loadSchools();
-  }, [page]);
+  }, [page, limit]);
 
   const loadSchools = async () => {
     try {
@@ -46,8 +46,8 @@ export default function SuperAdminSchools() {
       if (response.data.data && response.data.meta) {
         setSchools(response.data.data);
         setPaginationMeta(response.data.meta);
-      } else {
-        // Fallback for old format
+      } else if (Array.isArray(response.data)) {
+        // Fallback for old format (array)
         setSchools(response.data);
         setPaginationMeta({
           total: response.data.length,
@@ -57,6 +57,11 @@ export default function SuperAdminSchools() {
           hasNextPage: false,
           hasPrevPage: false,
         });
+      } else {
+        // Handle unexpected format
+        console.error('Unexpected response format:', response.data);
+        setSchools([]);
+        setPaginationMeta(null);
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load schools');
@@ -254,146 +259,177 @@ export default function SuperAdminSchools() {
         {/* Right Side - Schools List */}
         <div className="lg:col-span-2">
           <div className="card-modern rounded-2xl overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <FiLoader className="w-8 h-8 animate-spin text-indigo-600" />
-          </div>
-        ) : schools.length === 0 ? (
-          <div className="text-center py-12">
-            <FiHome className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No schools found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Subdomain</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {schools.map((school) => (
-                  <tr key={school.id} className="hover:bg-gray-50 transition-smooth">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{school.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{school.subdomain}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{school.email || '-'}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          school.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : school.status === 'suspended'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {school.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          to={`/super-admin/schools/${school.id}/details`}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-smooth"
-                          title="View Details"
-                        >
-                          <FiEye />
-                        </Link>
-                        <button
-                          onClick={() => handleEdit(school)}
-                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-smooth"
-                          title="Edit"
-                        >
-                          <FiEdit />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(school.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-smooth"
-                          title="Delete"
-                        >
-                          <FiTrash2 />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        
-        {/* Pagination */}
-        {paginationMeta && paginationMeta.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, paginationMeta.total)} of {paginationMeta.total} schools
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={!paginationMeta.hasPrevPage}
-                className={`p-2 rounded-lg transition-smooth ${
-                  paginationMeta.hasPrevPage
-                    ? 'text-gray-700 hover:bg-gray-100'
-                    : 'text-gray-300 cursor-not-allowed'
-                }`}
-              >
-                <FiChevronLeft className="w-5 h-5" />
-              </button>
-              
-              <div className="flex items-center gap-1">
-                {Array.from({ length: paginationMeta.totalPages }, (_, i) => i + 1)
-                  .filter((p) => {
-                    // Show first page, last page, current page, and pages around current
-                    return (
-                      p === 1 ||
-                      p === paginationMeta.totalPages ||
-                      (p >= page - 1 && p <= page + 1)
-                    );
-                  })
-                  .map((p, idx, arr) => {
-                    // Add ellipsis if there's a gap
-                    const prev = arr[idx - 1];
-                    const showEllipsis = prev && p - prev > 1;
-                    
-                    return (
-                      <div key={p} className="flex items-center gap-1">
-                        {showEllipsis && (
-                          <span className="px-2 text-gray-400">...</span>
-                        )}
-                        <button
-                          onClick={() => setPage(p)}
-                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-smooth ${
-                            p === page
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      </div>
-                    );
-                  })}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <FiLoader className="w-8 h-8 animate-spin text-indigo-600" />
               </div>
-              
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={!paginationMeta.hasNextPage}
-                className={`p-2 rounded-lg transition-smooth ${
-                  paginationMeta.hasNextPage
-                    ? 'text-gray-700 hover:bg-gray-100'
-                    : 'text-gray-300 cursor-not-allowed'
-                }`}
-              >
-                <FiChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        )}
+            ) : schools.length === 0 ? (
+              <div className="text-center py-12">
+                <FiHome className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No schools found</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Subdomain</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {schools.map((school) => (
+                        <tr key={school.id} className="hover:bg-gray-50 transition-smooth">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{school.name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{school.subdomain}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{school.email || '-'}</td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                school.status === 'active'
+                                  ? 'bg-green-100 text-green-800'
+                                  : school.status === 'suspended'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {school.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Link
+                                to={`/super-admin/schools/${school.id}/details`}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-smooth"
+                                title="View Details"
+                              >
+                                <FiEye />
+                              </Link>
+                              <button
+                                onClick={() => handleEdit(school)}
+                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-smooth"
+                                title="Edit"
+                              >
+                                <FiEdit />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(school.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-smooth"
+                                title="Delete"
+                              >
+                                <FiTrash2 />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Pagination - Always show when there's data */}
+                {paginationMeta && (
+                  <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      {/* Left: Info and Per Page Selector */}
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm text-gray-600">
+                          Showing {(page - 1) * limit + 1} to {Math.min(page * limit, paginationMeta.total)} of {paginationMeta.total} schools
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm text-gray-600">Per page:</label>
+                          <select
+                            value={limit}
+                            onChange={(e) => {
+                              setLimit(Number(e.target.value));
+                              setPage(1); // Reset to first page when changing limit
+                            }}
+                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                          >
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Right: Page Navigation - Always show when there's data */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPage(page - 1)}
+                          disabled={!paginationMeta.hasPrevPage || paginationMeta.totalPages <= 1}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-smooth border ${
+                            paginationMeta.hasPrevPage && paginationMeta.totalPages > 1
+                              ? 'border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 bg-white'
+                              : 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50'
+                          }`}
+                          title="Previous page"
+                        >
+                          <FiChevronLeft className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Page Numbers - Only show if more than 1 page */}
+                        {paginationMeta.totalPages > 1 && (
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: paginationMeta.totalPages }, (_, i) => i + 1)
+                              .filter((p) => {
+                                // Show first page, last page, current page, and pages around current
+                                return (
+                                  p === 1 ||
+                                  p === paginationMeta.totalPages ||
+                                  (p >= page - 1 && p <= page + 1)
+                                );
+                              })
+                              .map((p, idx, arr) => {
+                                // Add ellipsis if there's a gap
+                                const prev = arr[idx - 1];
+                                const showEllipsis = prev && p - prev > 1;
+                                
+                                return (
+                                  <div key={p} className="flex items-center gap-1">
+                                    {showEllipsis && (
+                                      <span className="px-2 text-gray-400">...</span>
+                                    )}
+                                    <button
+                                      onClick={() => setPage(p)}
+                                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-smooth border ${
+                                        p === page
+                                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                          : 'border-gray-300 text-gray-700 hover:bg-gray-100 bg-white'
+                                      }`}
+                                    >
+                                      {p}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+                        
+                        <button
+                          onClick={() => setPage(page + 1)}
+                          disabled={!paginationMeta.hasNextPage || paginationMeta.totalPages <= 1}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-smooth border ${
+                            paginationMeta.hasNextPage && paginationMeta.totalPages > 1
+                              ? 'border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 bg-white'
+                              : 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50'
+                          }`}
+                          title="Next page"
+                        >
+                          <FiChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
