@@ -178,6 +178,40 @@ npm run lint
 
 ## Troubleshooting
 
+### Issue: Docker Desktop API Errors (500 Internal Server Error)
+
+If you see errors like:
+
+```
+request returned 500 Internal Server Error
+unable to get image 'fee-frontend'
+```
+
+**Quick Fix:**
+
+1. **Restart Docker Desktop**
+
+   - Right-click Docker icon in system tray → Quit Docker Desktop
+   - Wait 10 seconds
+   - Start Docker Desktop again
+   - Wait for it to fully start (whale icon steady)
+
+2. **Verify Docker is running**
+
+   ```bash
+   docker ps
+   ```
+
+3. **Try again**
+   ```bash
+   docker-compose up -d
+   ```
+
+**If still not working:**
+
+- See `TROUBLESHOOTING.md` for detailed solutions
+- Or use database-only setup: `docker-compose -f docker-compose.db-only.yml up -d`
+
 ### Issue: Port already in use
 
 **Solution:**
