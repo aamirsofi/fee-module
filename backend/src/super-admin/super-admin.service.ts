@@ -9,9 +9,10 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UpdateUserDto } from '../users/dto/update-user.dto';
 import { SchoolsService } from '../schools/schools.service';
 import { UsersService } from '../users/users.service';
-import { Student } from '../students/entities/student.entity';
-import { Payment } from '../payments/entities/payment.entity';
+import { Student, StudentStatus } from '../students/entities/student.entity';
+import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { FeeStructure } from '../fee-structures/entities/fee-structure.entity';
+import { getPaginationParams, createPaginatedResponse } from '../common/utils/pagination.util';
 
 @Injectable()
 export class SuperAdminService {
@@ -36,26 +37,27 @@ export class SuperAdminService {
   }
 
   async getAllSchools(page: number = 1, limit: number = 10) {
-    const skip = (page - 1) * limit;
-    
-    const [schools, total] = await this.schoolsRepository.findAndCount({
-      relations: ['createdBy'],
-      order: { createdAt: 'desc' },
-      skip,
-      take: limit,
-    });
+    try {
+      const { skip, limit: take } = getPaginationParams(page, limit);
+      
+      // Debug logging
+      console.log('getAllSchools service called with:', { page, limit, skip });
+      
+      const [schools, total] = await this.schoolsRepository.findAndCount({
+        relations: { createdBy: true },
+        order: { createdAt: 'desc' },
+        skip,
+        take,
+      });
 
-    return {
-      data: schools,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPrevPage: page > 1,
-      },
-    };
+      // Debug logging
+      console.log('Query result:', { schoolsCount: schools.length, total, page, limit });
+
+      return createPaginatedResponse(schools, total, page, limit);
+    } catch (error) {
+      console.error('Error in getAllSchools:', error);
+      throw error;
+    }
   }
 
   async getSchool(id: number) {
@@ -106,18 +108,18 @@ export class SuperAdminService {
     const stats = {
       totalStudents: await this.studentsRepository.count({ where: { schoolId: id } }),
       activeStudents: await this.studentsRepository.count({
-        where: { schoolId: id, status: 'active' },
+        where: { schoolId: id, status: StudentStatus.ACTIVE },
       }),
       totalUsers: users.length,
       totalPayments: await this.paymentsRepository.count({ where: { schoolId: id } }),
       completedPayments: await this.paymentsRepository.count({
-        where: { schoolId: id, status: 'completed' },
+        where: { schoolId: id, status: PaymentStatus.COMPLETED },
       }),
       totalRevenue: await this.paymentsRepository
         .createQueryBuilder('payment')
         .select('SUM(payment.amount)', 'total')
         .where('payment.schoolId = :schoolId', { schoolId: id })
-        .andWhere('payment.status = :status', { status: 'completed' })
+        .andWhere('payment.status = :status', { status: PaymentStatus.COMPLETED })
         .getRawOne()
         .then((result) => parseFloat(result?.total || '0')),
       totalFeeStructures: feeStructures.length,
@@ -189,7 +191,7 @@ export class SuperAdminService {
       this.paymentsRepository
         .createQueryBuilder('payment')
         .select('SUM(payment.amount)', 'total')
-        .where('payment.status = :status', { status: 'completed' })
+        .where('payment.status = :status', { status: PaymentStatus.COMPLETED })
         .getRawOne(),
       this.schoolsRepository.find({
         take: 5,

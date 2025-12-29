@@ -38,16 +38,26 @@ export default function SuperAdminSchools() {
   const loadSchools = async () => {
     try {
       setLoading(true);
+      setError('');
+      
+      // Debug: Log the params being sent
+      console.log('Loading schools with params:', { page, limit });
+      
       const response = await api.instance.get('/super-admin/schools', {
         params: { page, limit },
       });
+      
+      // Debug: Log the response
+      console.log('Schools API response:', response.data);
       
       // Handle both old format (array) and new format (paginated)
       if (response.data.data && response.data.meta) {
         setSchools(response.data.data);
         setPaginationMeta(response.data.meta);
+        console.log('Pagination meta:', response.data.meta);
       } else if (Array.isArray(response.data)) {
         // Fallback for old format (array)
+        console.warn('Received old format (array), converting to paginated format');
         setSchools(response.data);
         setPaginationMeta({
           total: response.data.length,
@@ -64,6 +74,7 @@ export default function SuperAdminSchools() {
         setPaginationMeta(null);
       }
     } catch (err: any) {
+      console.error('Error loading schools:', err);
       setError(err.response?.data?.message || 'Failed to load schools');
     } finally {
       setLoading(false);

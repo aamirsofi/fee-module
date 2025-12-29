@@ -46,9 +46,23 @@ export class SuperAdminController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.superAdminService.getAllSchools(pageNum, limitNum);
+    try {
+      const pageNum = page ? Math.max(1, parseInt(page, 10)) : 1;
+      const limitNum = limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 10;
+      
+      // Debug logging
+      console.log('getAllSchools controller called with:', { 
+        rawPage: page, 
+        rawLimit: limit, 
+        parsedPage: pageNum, 
+        parsedLimit: limitNum 
+      });
+      
+      return this.superAdminService.getAllSchools(pageNum, limitNum);
+    } catch (error) {
+      console.error('Error in getAllSchools controller:', error);
+      throw error;
+    }
   }
 
   @Get('schools/:id')
