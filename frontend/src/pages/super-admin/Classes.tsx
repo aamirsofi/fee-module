@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FiEdit,
   FiTrash2,
@@ -6,7 +6,10 @@ import {
   FiBook,
   FiX,
   FiSearch,
+  FiUpload,
+  FiDownload,
 } from "react-icons/fi";
+import { useDropzone } from "react-dropzone";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import Pagination from "../../components/Pagination";
@@ -49,12 +52,24 @@ export default function Classes() {
   const [loading, setLoading] = useState(true);
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [mode, setMode] = useState<"add" | "import">("add");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     status: "active" as string,
     schoolId: "" as string | number,
   });
+  const [importSchoolId, setImportSchoolId] = useState<string | number>("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: number;
+    failed: number;
+    skipped: number;
+    errors: Array<{ row: number; error: string }>;
+    duplicates: Array<{ row: number; name: string; reason: string }>;
+  } | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [page, setPage] = useState(1);
@@ -252,6 +267,244 @@ export default function Classes() {
     setSuccess("");
   };
 
+  // Download sample CSV
+  const downloadSampleCSV = () => {
+    if (!importSchoolId) {
+      setError("Please select a school first");
+      return;
+    }
+
+    const headers = ["schoolId", "name", "description", "status"];
+    const sampleRow = [importSchoolId.toString(), "Grade 1", "First grade class", "active"];
+    
+    const csvContent = [
+      headers.join(","),
+      sampleRow.join(","),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `classes_sample_${importSchoolId}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Parse CSV file
+  const parseCSV = useCallback((file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split("\n").filter((line) => line.trim());
+          
+          if (lines.length < 2) {
+            reject(new Error("CSV file must have at least a header row and one data row"));
+            return;
+          }
+
+          const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+          const data: any[] = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(",").map((v) => v.trim());
+            const row: any = {};
+            
+            headers.forEach((header, index) => {
+              row[header] = values[index] || "";
+            });
+
+            if (row.name) {
+              data.push({
+                schoolId: row.schoolid || importSchoolId,
+                name: row.name,
+                description: row.description || "",
+                status: row.status || "active",
+              });
+            }
+          }
+
+          resolve(data);
+        } catch (err) {
+          reject(new Error("Failed to parse CSV file"));
+        }
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(file);
+    });
+  }, [importSchoolId]);
+
+  // Handle file drop
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    if (!importSchoolId) {
+      setError("Please select a school first");
+      return;
+    }
+
+    if (!file.name.match(/\.(csv)$/i)) {
+      setError("Please upload a CSV file");
+      return;
+    }
+
+    try {
+      setImportFile(file);
+      const data = await parseCSV(file);
+      setImportPreview(data.slice(0, 10)); // Preview first 10 rows
+      setError("");
+    } catch (err: any) {
+      setError(err.message || "Failed to parse CSV file");
+      setImportFile(null);
+      setImportPreview([]);
+    }
+  }, [importSchoolId, parseCSV]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "text/csv": [".csv"],
+    },
+    multiple: false,
+  });
+
+  // Handle bulk import
+  const handleBulkImport = async () => {
+    if (!importFile || !importSchoolId) {
+      setError("Please select a school and upload a CSV file");
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      setError("");
+      setSuccess("");
+      setImportResult(null);
+
+      const classesData = await parseCSV(importFile);
+      
+      if (classesData.length === 0) {
+        setError("No valid classes found in CSV file");
+        return;
+      }
+
+      // Fetch existing classes for duplicate checking
+      const existingClassesResponse = await api.instance.get("/classes", {
+        params: { schoolId: importSchoolId, limit: 1000 },
+      });
+      const existingClasses = existingClassesResponse.data.data || existingClassesResponse.data || [];
+      const existingClassNames = new Set(
+        existingClasses.map((cls: Class) => cls.name.toLowerCase().trim())
+      );
+
+      // Check for duplicates within CSV
+      const csvClassNames = new Map<string, number[]>(); // name -> array of row numbers
+      classesData.forEach((classData, index) => {
+        const name = classData.name.toLowerCase().trim();
+        if (!csvClassNames.has(name)) {
+          csvClassNames.set(name, []);
+        }
+        csvClassNames.get(name)!.push(index + 2); // +2 because row 1 is header
+      });
+
+      const results = {
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        errors: [] as Array<{ row: number; error: string }>,
+        duplicates: [] as Array<{ row: number; name: string; reason: string }>,
+      };
+
+      // Import classes one by one
+      for (let i = 0; i < classesData.length; i++) {
+        const classData = classesData[i];
+        const className = classData.name.trim();
+        const classNameLower = className.toLowerCase();
+        const rowNumber = i + 2; // +2 because row 1 is header
+
+        // Check for duplicates within CSV (skip if not first occurrence)
+        const occurrences = csvClassNames.get(classNameLower) || [];
+        if (occurrences.length > 1 && occurrences[0] !== rowNumber) {
+          results.skipped++;
+          results.duplicates.push({
+            row: rowNumber,
+            name: className,
+            reason: `Duplicate name in CSV (first occurrence at row ${occurrences[0]})`,
+          });
+          continue;
+        }
+
+        // Check for duplicates against existing classes
+        if (existingClassNames.has(classNameLower)) {
+          results.skipped++;
+          results.duplicates.push({
+            row: rowNumber,
+            name: className,
+            reason: "Class already exists in database",
+          });
+          continue;
+        }
+
+        try {
+          await api.instance.post(`/classes?schoolId=${importSchoolId}`, {
+            name: classData.name,
+            description: classData.description || undefined,
+            status: classData.status || "active",
+          });
+          results.success++;
+          // Add to existing set to prevent duplicates within the same import batch
+          existingClassNames.add(classNameLower);
+        } catch (err: any) {
+          const errorMessage = err.response?.data?.message || "Failed to create class";
+          
+          // Check if it's a duplicate error
+          if (errorMessage.toLowerCase().includes("already exists")) {
+            results.skipped++;
+            results.duplicates.push({
+              row: rowNumber,
+              name: className,
+              reason: "Class already exists in database",
+            });
+          } else {
+            results.failed++;
+            results.errors.push({
+              row: rowNumber,
+              error: errorMessage,
+            });
+          }
+        }
+      }
+
+      setImportResult(results);
+      if (results.success > 0) {
+        setSuccess(`Successfully imported ${results.success} class(es)`);
+        if (results.skipped > 0) {
+          setSuccess(
+            `Successfully imported ${results.success} class(es). ${results.skipped} duplicate(s) skipped.`
+          );
+        }
+        setImportFile(null);
+        setImportPreview([]);
+        loadClasses();
+      }
+      if (results.failed > 0) {
+        setError(`${results.failed} class(es) failed to import. Check errors below.`);
+      }
+      if (results.skipped > 0 && results.success === 0) {
+        setError(`All ${results.skipped} class(es) were duplicates and skipped.`);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to import classes");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -277,13 +530,51 @@ export default function Classes() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Side - Add/Edit Form */}
+        {/* Left Side - Add/Edit Form or Import */}
         <div className="card-modern rounded-xl p-4 lg:col-span-1">
-          <h2 className="text-lg font-bold text-gray-800 mb-3">
-            {editingClass ? "Edit Class" : "Add Class"}
-          </h2>
+          {/* Tabs */}
+          <div className="flex gap-2 mb-4 border-b border-gray-200">
+            <button
+              onClick={() => {
+                setMode("add");
+                setError("");
+                setSuccess("");
+                setImportFile(null);
+                setImportPreview([]);
+                setImportResult(null);
+              }}
+              className={`px-4 py-2 text-sm font-semibold transition-smooth ${
+                mode === "add"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Add Class
+            </button>
+            <button
+              onClick={() => {
+                setMode("import");
+                setError("");
+                setSuccess("");
+                resetForm();
+              }}
+              className={`px-4 py-2 text-sm font-semibold transition-smooth ${
+                mode === "import"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Import Classes
+            </button>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
+          {mode === "add" ? (
+            <>
+              <h2 className="text-lg font-bold text-gray-800 mb-3">
+                {editingClass ? "Edit Class" : "Add Class"}
+              </h2>
+
+              <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-0.5">
                 School <span className="text-red-500">*</span>
@@ -397,6 +688,205 @@ export default function Classes() {
               )}
             </div>
           </form>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-bold text-gray-800 mb-3">
+                Import Classes from CSV
+              </h2>
+
+              <div className="space-y-4">
+                {/* School Selection for Import */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                    School <span className="text-red-500">*</span>
+                  </label>
+                  {loadingSchools ? (
+                    <div className="flex items-center justify-center py-2">
+                      <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                      <span className="ml-2 text-xs text-gray-600">Loading...</span>
+                    </div>
+                  ) : (
+                    <CustomDropdown
+                      options={schools.map((school) => ({
+                        value: school.id.toString(),
+                        label: school.name,
+                      }))}
+                      value={importSchoolId?.toString() || ""}
+                      onChange={(value) => {
+                        const schoolId = value ? parseInt(value as string) : "";
+                        setImportSchoolId(schoolId);
+                        setImportFile(null);
+                        setImportPreview([]);
+                        setImportResult(null);
+                      }}
+                      placeholder="Select a school..."
+                      className="w-full"
+                    />
+                  )}
+                </div>
+
+                {/* Download Sample CSV */}
+                {importSchoolId && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={downloadSampleCSV}
+                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition-smooth flex items-center justify-center gap-2"
+                    >
+                      <FiDownload className="w-4 h-4" />
+                      Download Sample CSV
+                    </button>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Download a sample CSV with school ID pre-filled
+                    </p>
+                  </div>
+                )}
+
+                {/* File Upload */}
+                {importSchoolId && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-2">
+                      Upload CSV File <span className="text-red-500">*</span>
+                    </label>
+                    <div
+                      {...getRootProps()}
+                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-smooth ${
+                        isDragActive
+                          ? "border-indigo-500 bg-indigo-50"
+                          : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input {...getInputProps()} />
+                      <FiUpload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                      {importFile ? (
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">
+                            {importFile.name}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setImportFile(null);
+                              setImportPreview([]);
+                            }}
+                            className="mt-2 text-xs text-red-600 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-gray-600">
+                            {isDragActive
+                              ? "Drop your CSV file here"
+                              : "Drag & drop your CSV file here"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            or click to browse
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview */}
+                {importPreview.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-2">
+                      Preview ({importPreview.length} rows)
+                    </label>
+                    <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-2 py-1 text-left">Name</th>
+                            <th className="px-2 py-1 text-left">Description</th>
+                            <th className="px-2 py-1 text-left">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreview.map((row, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-2 py-1">{row.name}</td>
+                              <td className="px-2 py-1">{row.description || "-"}</td>
+                              <td className="px-2 py-1">{row.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Import Button */}
+                {importFile && importSchoolId && (
+                  <button
+                    type="button"
+                    onClick={handleBulkImport}
+                    disabled={isImporting}
+                    className={`w-full px-3 py-2 rounded-lg text-sm font-semibold shadow transition-all ${
+                      isImporting
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
+                    }`}
+                  >
+                    {isImporting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <FiLoader className="w-4 h-4 animate-spin" />
+                        Importing...
+                      </span>
+                    ) : (
+                      "Import Classes"
+                    )}
+                  </button>
+                )}
+
+                {/* Import Results */}
+                {importResult && (
+                  <div className="space-y-2">
+                    {importResult.success > 0 && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm font-semibold text-green-800">
+                          Successfully imported: {importResult.success} class(es)
+                        </p>
+                      </div>
+                    )}
+                    {importResult.skipped > 0 && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm font-semibold text-yellow-800 mb-2">
+                          Skipped (duplicates): {importResult.skipped} class(es)
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-xs text-yellow-700">
+                          {importResult.duplicates.map((dup, idx) => (
+                            <div key={idx} className="mb-1">
+                              Row {dup.row} - "{dup.name}": {dup.reason}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {importResult.failed > 0 && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm font-semibold text-red-800 mb-2">
+                          Failed: {importResult.failed} class(es)
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-xs text-red-700">
+                          {importResult.errors.map((err, idx) => (
+                            <div key={idx} className="mb-1">
+                              Row {err.row}: {err.error}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right Side - Listing */}

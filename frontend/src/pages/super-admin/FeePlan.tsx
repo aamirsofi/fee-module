@@ -6,6 +6,7 @@ import {
   FiDollarSign,
   FiX,
   FiSearch,
+  FiDownload,
 } from "react-icons/fi";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
@@ -27,6 +28,9 @@ export default function FeePlan() {
   const [feeCategories, setFeeCategories] = useState<FeeCategory[]>([]);
   const [categoryHeads, setCategoryHeads] = useState<CategoryHead[]>([]);
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
+  const [classOptions, setClassOptions] = useState<
+    Array<{ id: number; name: string }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -66,6 +70,8 @@ export default function FeePlan() {
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(
     null
   );
+  const [selectedFeePlanIds, setSelectedFeePlanIds] = useState<number[]>([]);
+  const [isSelectAll, setIsSelectAll] = useState(false);
 
   useEffect(() => {
     loadFeeStructures();
@@ -92,7 +98,10 @@ export default function FeePlan() {
     } else {
       setFeeCategories([]);
       setCategoryHeads([]);
+      setClassOptions([]);
       setAvailableClasses([]);
+      // Clear class selection when school changes
+      setFormData((prev) => ({ ...prev, class: "" }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.schoolId]);
@@ -200,17 +209,41 @@ export default function FeePlan() {
 
     try {
       setLoadingClasses(true);
-      // Fetch unique classes directly from the dedicated endpoint
-      const response = await api.instance.get(
-        `/super-admin/schools/${formData.schoolId}/classes`
-      );
+      // Fetch classes from the Classes module
+      const response = await api.instance.get("/classes", {
+        params: {
+          schoolId: formData.schoolId,
+          limit: 1000, // Get all classes
+          page: 1,
+        },
+      });
 
-      // The endpoint returns an array of unique class names
-      const classes = Array.isArray(response.data) ? response.data : [];
-      setAvailableClasses(classes);
+      // Extract class objects and names from the response
+      let classes: Array<{ id: number; name: string }> = [];
+      let classNames: string[] = [];
+
+      if (response.data.data && Array.isArray(response.data.data)) {
+        // Paginated response
+        classes = response.data.data.map((cls: any) => ({
+          id: cls.id,
+          name: cls.name,
+        }));
+        classNames = response.data.data.map((cls: any) => cls.name);
+      } else if (Array.isArray(response.data)) {
+        // Direct array response
+        classes = response.data.map((cls: any) => ({
+          id: cls.id,
+          name: cls.name,
+        }));
+        classNames = response.data.map((cls: any) => cls.name);
+      }
+
+      setClassOptions(classes);
+      setAvailableClasses(classNames);
     } catch (err: any) {
       console.error("Error loading classes:", err);
       console.error("Error details:", err.response?.data);
+      setClassOptions([]);
       setAvailableClasses([]);
     } finally {
       setLoadingClasses(false);
@@ -292,12 +325,21 @@ export default function FeePlan() {
           setError("Please select a fee heading");
           return;
         }
+        if (!formData.class || !formData.class.trim()) {
+          setError("Please select a class");
+          return;
+        }
       }
 
       const currentSchoolId = formData.schoolId;
 
       if (editingStructure) {
         // Single edit mode
+        if (!formData.class || !formData.class.trim()) {
+          setError("Please select a class");
+          return;
+        }
+
         const selectedCategory = feeCategories.find(
           (cat) => cat.id === parseInt(formData.feeCategoryId as string)
         );
@@ -311,23 +353,18 @@ export default function FeePlan() {
             }`
           : "Fee Plan";
 
-        const planName = `${basePlanName}${
-          formData.class ? ` (${formData.class})` : ""
-        }`;
+        const planName = `${basePlanName} (${formData.class})`;
 
         const payload: any = {
           name: planName,
           feeCategoryId: parseInt(formData.feeCategoryId as string),
           amount: parseFloat(formData.amount),
           status: formData.status,
+          class: formData.class.trim(),
         };
 
         if (formData.categoryHeadId) {
           payload.categoryHeadId = parseInt(formData.categoryHeadId as string);
-        }
-
-        if (formData.class.trim()) {
-          payload.class = formData.class.trim();
         }
 
         await api.instance.patch(
@@ -470,25 +507,20 @@ export default function FeePlan() {
               }`
             : "Fee Plan";
 
-          const planName = `${basePlanName}${
-            formData.class ? ` (${formData.class})` : ""
-          }`;
+          const planName = `${basePlanName} (${formData.class})`;
 
           const payload: any = {
             name: planName,
             feeCategoryId: parseInt(formData.feeCategoryId as string),
             amount: parseFloat(formData.amount),
             status: formData.status,
+            class: formData.class.trim(),
           };
 
           if (formData.categoryHeadId) {
             payload.categoryHeadId = parseInt(
               formData.categoryHeadId as string
             );
-          }
-
-          if (formData.class.trim()) {
-            payload.class = formData.class.trim();
           }
 
           await api.instance.post(
@@ -573,6 +605,141 @@ export default function FeePlan() {
     setError("");
     setSuccess("");
   };
+
+  // Bulk operations
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = feeStructures.map((s) => s.id);
+      setSelectedFeePlanIds(allIds);
+      setIsSelectAll(true);
+    } else {
+      setSelectedFeePlanIds([]);
+      setIsSelectAll(false);
+    }
+  };
+
+  const handleSelectFeePlan = (id: number, checked: boolean) => {
+    if (checked) {
+      setSelectedFeePlanIds([...selectedFeePlanIds, id]);
+    } else {
+      setSelectedFeePlanIds(selectedFeePlanIds.filter((fid) => fid !== id));
+      setIsSelectAll(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedFeePlanIds.length === 0) {
+      setError("Please select at least one fee plan to delete");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedFeePlanIds.length} fee plan(s)? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setError("");
+      setSuccess("");
+
+      // Delete all selected fee plans
+      const deletePromises = selectedFeePlanIds.map(async (id) => {
+        const structure = feeStructures.find((s) => s.id === id);
+        if (structure) {
+          return api.instance.delete(
+            `/super-admin/fee-structures/${id}?schoolId=${structure.schoolId}`
+          );
+        }
+      });
+
+      await Promise.all(deletePromises);
+      setSuccess(
+        `Successfully deleted ${selectedFeePlanIds.length} fee plan(s)!`
+      );
+      setSelectedFeePlanIds([]);
+      setIsSelectAll(false);
+      loadFeeStructures();
+      setTimeout(() => setSuccess(""), 5000);
+    } catch (err: any) {
+      const errorMessage =
+        err.response?.data?.message || "Failed to delete fee plans";
+      setError(errorMessage);
+      setTimeout(() => setError(""), 5000);
+    }
+  };
+
+  const handleExport = () => {
+    if (selectedFeePlanIds.length === 0) {
+      setError("Please select at least one fee plan to export");
+      return;
+    }
+
+    // Get selected fee plans
+    const selectedPlans = feeStructures.filter((s) =>
+      selectedFeePlanIds.includes(s.id)
+    );
+
+    // Convert to CSV
+    const headers = [
+      "Plan Name",
+      "School",
+      "Class",
+      "Category Head",
+      "Fee Heading",
+      "Amount",
+      "Status",
+      "Created At",
+    ];
+
+    const rows = selectedPlans.map((plan) => [
+      plan.name,
+      plan.school?.name || `School ID: ${plan.schoolId}`,
+      plan.class || "",
+      plan.categoryHead?.name || "General",
+      plan.category?.name || `Category ID: ${plan.feeCategoryId}`,
+      plan.amount.toString(),
+      plan.status,
+      new Date(plan.createdAt).toLocaleDateString(),
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `fee-plans-${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setSuccess(
+      `Exported ${selectedFeePlanIds.length} fee plan(s) successfully!`
+    );
+    setTimeout(() => setSuccess(""), 3000);
+  };
+
+  // Update select all state when selection changes
+  useEffect(() => {
+    if (feeStructures.length > 0) {
+      setIsSelectAll(
+        selectedFeePlanIds.length === feeStructures.length &&
+          feeStructures.every((s) => selectedFeePlanIds.includes(s.id))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFeePlanIds, feeStructures]);
 
   return (
     <div className="space-y-6">
@@ -873,23 +1040,37 @@ export default function FeePlan() {
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Class <span className="text-gray-400 text-xs">(Optional)</span>
+                Class <span className="text-red-500">*</span>
               </label>
               {createMode === "single" ? (
-                <input
-                  type="text"
-                  value={formData.class}
-                  onChange={(e) =>
-                    setFormData({ ...formData, class: e.target.value })
-                  }
-                  placeholder="e.g., Grade 1"
-                  disabled={!formData.schoolId}
-                  className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
-                    !formData.schoolId
-                      ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                      : "bg-white"
-                  }`}
-                />
+                !formData.schoolId ? (
+                  <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                    Select school first
+                  </div>
+                ) : loadingClasses ? (
+                  <div className="flex items-center justify-center py-2">
+                    <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
+                    <span className="ml-1.5 text-xs text-gray-600">
+                      Loading...
+                    </span>
+                  </div>
+                ) : (
+                  <CustomDropdown
+                    options={classOptions.map((cls) => ({
+                      value: cls.name,
+                      label: cls.name,
+                    }))}
+                    value={formData.class || ""}
+                    onChange={(value) => {
+                      setFormData({
+                        ...formData,
+                        class: value as string,
+                      });
+                    }}
+                    placeholder="Select a class..."
+                    className="w-full"
+                  />
+                )
               ) : (
                 <div className="space-y-1">
                   {loadingClasses ? (
@@ -1046,7 +1227,7 @@ export default function FeePlan() {
         {/* Right Side - List */}
         <div className="card-modern rounded-xl p-6 lg:col-span-2">
           {/* Search and Filter */}
-          <div className="mb-4 space-y-3">
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -1072,27 +1253,22 @@ export default function FeePlan() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Filter by School
-                </label>
-                <CustomDropdown
-                  options={[
-                    { value: "", label: "All Schools" },
-                    ...schools.map((school) => ({
-                      value: school.id.toString(),
-                      label: school.name,
-                    })),
-                  ]}
-                  value={selectedSchoolId?.toString() || ""}
-                  onChange={(value) => {
-                    setSelectedSchoolId(value ? parseInt(value as string) : "");
-                    setPage(1);
-                  }}
-                  className="w-full"
-                />
-              </div>
+            <div>
+              <CustomDropdown
+                options={[
+                  { value: "", label: "All Schools" },
+                  ...schools.map((school) => ({
+                    value: school.id.toString(),
+                    label: school.name,
+                  })),
+                ]}
+                value={selectedSchoolId?.toString() || ""}
+                onChange={(value) => {
+                  setSelectedSchoolId(value ? parseInt(value as string) : "");
+                  setPage(1);
+                }}
+                className="w-full"
+              />
             </div>
           </div>
 
@@ -1112,18 +1288,61 @@ export default function FeePlan() {
             </div>
           ) : (
             <>
+              {/* Bulk Actions Bar */}
+              {selectedFeePlanIds.length > 0 && (
+                <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-indigo-900">
+                      {selectedFeePlanIds.length} fee plan(s) selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleExport}
+                      className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-smooth flex items-center gap-2"
+                    >
+                      <FiDownload className="w-4 h-4" />
+                      Export
+                    </button>
+                    <button
+                      onClick={handleBulkDelete}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-smooth flex items-center gap-2"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                      Delete ({selectedFeePlanIds.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedFeePlanIds([]);
+                        setIsSelectAll(false);
+                      }}
+                      className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-smooth"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                     <tr>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-12">
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelectAll}
+                            onChange={(e) => handleSelectAll(e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                        </label>
+                      </th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         Plan Name
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         School
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Fee Heading
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         Category Head
@@ -1143,8 +1362,29 @@ export default function FeePlan() {
                     {feeStructures.map((structure) => (
                       <tr
                         key={structure.id}
-                        className="hover:bg-indigo-50/50 transition-all duration-150 group"
+                        className={`hover:bg-indigo-50/50 transition-all duration-150 group ${
+                          selectedFeePlanIds.includes(structure.id)
+                            ? "bg-indigo-50"
+                            : ""
+                        }`}
                       >
+                        <td className="px-4 py-3">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedFeePlanIds.includes(
+                                structure.id
+                              )}
+                              onChange={(e) =>
+                                handleSelectFeePlan(
+                                  structure.id,
+                                  e.target.checked
+                                )
+                              }
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                          </label>
+                        </td>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-gray-900">
                             {structure.name}
@@ -1154,19 +1394,10 @@ export default function FeePlan() {
                               {structure.description}
                             </div>
                           )}
-                          {structure.class && (
-                            <div className="text-xs text-indigo-600 mt-0.5">
-                              Class: {structure.class}
-                            </div>
-                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {structure.school?.name ||
                             `School ID: ${structure.schoolId}`}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {structure.category?.name ||
-                            `Category ID: ${structure.feeCategoryId}`}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {structure.categoryHead?.name || "General"}
