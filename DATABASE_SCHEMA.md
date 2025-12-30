@@ -13,6 +13,9 @@ This document describes the database schema for the School ERP Fee Management Sy
 3. [Payment Tables](#payment-tables)
 4. [Entity Relationships](#entity-relationships)
 5. [Enums](#enums)
+6. [Indexes](#indexes)
+7. [Constraints](#constraints)
+8. [Version History](#version-history)
 
 ---
 
@@ -44,6 +47,7 @@ Master table for all schools in the system.
 - One-to-Many: `feeStructures` → `FeeStructure[]`
 - One-to-Many: `categoryHeads` → `CategoryHead[]`
 - One-to-Many: `payments` → `Payment[]`
+- One-to-Many: `classes` → `Class[]`
 - Many-to-One: `createdBy` → `User`
 
 ---
@@ -102,6 +106,31 @@ Student records linked to schools.
 
 ---
 
+### `classes`
+
+Class/Grade definitions for schools.
+
+| Column        | Type         | Constraints                 | Description                         |
+| ------------- | ------------ | --------------------------- | ----------------------------------- |
+| `id`          | INTEGER      | PRIMARY KEY, AUTO_INCREMENT | Unique identifier                   |
+| `schoolId`    | INTEGER      | NOT NULL, FK → schools.id   | School this class belongs to        |
+| `name`        | VARCHAR(255) | NOT NULL                    | Class name (e.g., "Grade 1")        |
+| `description` | TEXT         | NULLABLE                    | Optional description                |
+| `status`      | ENUM         | NOT NULL, DEFAULT 'active'  | Status: 'active' or 'inactive'      |
+| `createdAt`   | TIMESTAMP    | NOT NULL                    | Creation timestamp                  |
+| `updatedAt`   | TIMESTAMP    | NOT NULL                    | Last update timestamp               |
+
+**Relationships:**
+
+- Many-to-One: `school` → `School`
+
+**Business Rules:**
+
+- Name must be unique within a school
+- Cannot delete if used by any students or fee structures
+
+---
+
 ## Fee Management Tables
 
 ### `category_heads`
@@ -153,7 +182,8 @@ Fee categories/headings (e.g., "Tuition Fee", "Library Fee", "Transport Fee").
 
 **Business Rules:**
 
-- Name must be unique within a school
+- Name must be unique within a school when combined with `type` (same name can exist with different types)
+- Example: "Tuition Fee" with type "school" and "Tuition Fee" with type "transport" are allowed
 - `applicableMonths` is a JSON array: `[1,2,3]` means Jan, Feb, Mar
 - Empty array or null means applicable to all 12 months
 
@@ -180,7 +210,7 @@ Fee structures/plans that combine fee categories with category heads, amounts, c
 | `description`    | TEXT          | NULLABLE                         | Optional description                          |
 | `amount`         | DECIMAL(10,2) | NOT NULL                         | Fee amount                                    |
 | `class`          | VARCHAR(255)  | NULLABLE                         | Applicable class (e.g., "Grade 1", "Grade 2") |
-| `academicYear`   | VARCHAR(255)  | NOT NULL                         | Academic year (e.g., "2024-2025")             |
+| `academicYear`   | VARCHAR(255)  | NULLABLE                         | Academic year (e.g., "2024-2025")             |
 | `dueDate`        | DATE          | NULLABLE                         | Due date for payment                          |
 | `status`         | ENUM          | NOT NULL, DEFAULT 'active'       | Status: 'active' or 'inactive'                |
 | `createdAt`      | TIMESTAMP     | NOT NULL                         | Creation timestamp                            |
@@ -199,6 +229,8 @@ Fee structures/plans that combine fee categories with category heads, amounts, c
 - Links a Fee Category with a Category Head to create specific fee plans
 - Example: "Tuition Fee" (category) + "General" (category head) = "Tuition Fee for General Students"
 - Same fee category can have multiple structures for different category heads
+- `academicYear` and `dueDate` are optional fields (nullable)
+- `class` field stores the class name as a string (can reference `classes` table in future)
 
 ---
 
@@ -273,6 +305,7 @@ Payment records tracking actual payments made by students.
 schools (1)
   ├── (M) users
   ├── (M) students
+  ├── (M) classes
   ├── (M) category_heads
   ├── (M) fee_categories
   │       └── (M) fee_structures
@@ -290,14 +323,15 @@ fee_structures (1)
 
 ### Key Relationships
 
-1. **School → Fee Categories**: One school has many fee categories
-2. **School → Category Heads**: One school has many category heads
-3. **Fee Category → Fee Structures**: One fee category can have many fee structures
-4. **Category Head → Fee Structures**: One category head can have many fee structures
-5. **Fee Structure → Student Fee Structures**: One fee structure can be assigned to many students
-6. **Fee Structure → Payments**: One fee structure can have many payment records
-7. **Student → Student Fee Structures**: One student can have many fee assignments
-8. **Student → Payments**: One student can make many payments
+1. **School → Classes**: One school has many classes
+2. **School → Fee Categories**: One school has many fee categories
+3. **School → Category Heads**: One school has many category heads
+4. **Fee Category → Fee Structures**: One fee category can have many fee structures
+5. **Category Head → Fee Structures**: One category head can have many fee structures
+6. **Fee Structure → Student Fee Structures**: One fee structure can be assigned to many students
+7. **Fee Structure → Payments**: One fee structure can have many payment records
+8. **Student → Student Fee Structures**: One student can have many fee assignments
+9. **Student → Payments**: One student can make many payments
 
 ---
 
@@ -364,6 +398,11 @@ fee_structures (1)
 - `INACTIVE` - Student is inactive
 - `GRADUATED` - Student has graduated
 
+### `ClassStatus`
+
+- `ACTIVE` - Class is active
+- `INACTIVE` - Class is inactive
+
 ---
 
 ## Data Flow Example
@@ -387,9 +426,11 @@ fee_structures (1)
 3. **Create Fee Structure**: Combine Category + Category Head
 
    ```sql
-   INSERT INTO fee_structures (feeCategoryId, categoryHeadId, name, amount, academicYear, schoolId, status)
-   VALUES (1, 1, 'Tuition Fee for General Students', 500.00, '2024-2025', 1, 'active');
+   INSERT INTO fee_structures (feeCategoryId, categoryHeadId, name, amount, class, academicYear, schoolId, status)
+   VALUES (1, 1, 'Tuition Fee for General Students - Grade 1', 500.00, 'Grade 1', '2024-2025', 1, 'active');
    ```
+   
+   Note: `academicYear` and `dueDate` are optional and can be NULL.
 
 4. **Assign to Student**: Create student fee structure
 
@@ -424,6 +465,10 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_students_schoolId ON students(schoolId);
 CREATE INDEX idx_students_studentId ON students(studentId);
 CREATE INDEX idx_students_status ON students(status);
+
+-- Classes
+CREATE INDEX idx_classes_schoolId ON classes(schoolId);
+CREATE INDEX idx_classes_status ON classes(status);
 
 -- Category Heads
 CREATE INDEX idx_category_heads_schoolId ON category_heads(schoolId);
@@ -463,6 +508,7 @@ CREATE INDEX idx_payments_status ON payments(status);
 - `users.schoolId` → `schools.id`
 - `students.schoolId` → `schools.id`
 - `students.userId` → `users.id`
+- `classes.schoolId` → `schools.id`
 - `category_heads.schoolId` → `schools.id`
 - `fee_categories.schoolId` → `schools.id`
 - `fee_structures.schoolId` → `schools.id`
@@ -496,6 +542,10 @@ CREATE INDEX idx_payments_status ON payments(status);
 
 ## Version History
 
-- **v1.0** (Current): Initial schema with Category Heads, Fee Categories, Fee Structures, and Payments
-- Added `categoryHeadId` to `fee_structures` (moved from `fee_categories`)
-- Added `applicableMonths` JSON field to `fee_categories`
+- **v1.2** (Current): 
+  - Added `classes` table for class/grade management
+  - Made `academicYear` and `dueDate` nullable in `fee_structures`
+  - Added `applicableMonths` JSON field to `fee_categories`
+- **v1.1**: 
+  - Added `categoryHeadId` to `fee_structures` (moved from `fee_categories`)
+- **v1.0**: Initial schema with Category Heads, Fee Categories, Fee Structures, and Payments
