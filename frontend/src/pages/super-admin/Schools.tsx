@@ -417,27 +417,22 @@ export default function SuperAdminSchools() {
                           {paginationMeta.total} schools
                         </div>
                         <div className="flex items-center gap-2">
-                          <label className="text-sm text-gray-600 whitespace-nowrap">
-                            Per page:
-                          </label>
-                          <div className="w-20 min-w-20 relative">
-                            <CustomDropdown
-                              options={[
-                                { value: 5, label: "5" },
-                                { value: 10, label: "10" },
-                                { value: 20, label: "20" },
-                                { value: 50, label: "50" },
-                                { value: 100, label: "100" },
-                              ]}
-                              value={limit}
-                              onChange={(value) => {
-                                setLimit(Number(value));
-                                setPage(1); // Reset to first page when changing limit
-                              }}
-                              placeholder="Select..."
-                            />
-                          </div>
-                        </div>
+                      <label className="text-sm text-gray-600">Per page:</label>
+                      <select
+                        value={limit}
+                        onChange={(e) => {
+                          setLimit(Number(e.target.value));
+                          setPage(1); // Reset to first page when changing limit
+                        }}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
                       </div>
 
                       {/* Right: Page Navigation - Always show when there's data */}
