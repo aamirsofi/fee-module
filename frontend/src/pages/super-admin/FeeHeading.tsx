@@ -4,8 +4,6 @@ import {
   FiTrash2,
   FiLoader,
   FiDollarSign,
-  FiChevronLeft,
-  FiChevronRight,
   FiX,
   FiSearch,
   FiUpload,
@@ -14,6 +12,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+import Pagination from "../../components/Pagination";
 
 interface FeeCategory {
   id: number;
@@ -1127,6 +1126,9 @@ export default function FeeHeading() {
                               e.stopPropagation();
                               setImportFile(null);
                               setImportPreview([]);
+                              setImportResult(null);
+                              setError("");
+                              setSuccess("");
                             }}
                             className="mt-2 text-xs text-red-600 hover:text-red-700"
                           >
@@ -1535,105 +1537,18 @@ export default function FeeHeading() {
               </div>
 
               {/* Pagination */}
-              {paginationMeta && paginationMeta.totalPages > 1 && (
-                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-sm text-gray-700">
-                    Showing {(page - 1) * limit + 1} to{" "}
-                    {Math.min(page * limit, paginationMeta.total)} of{" "}
-                    {paginationMeta.total} results
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-semibold text-gray-800 whitespace-nowrap">
-                      Per page:
-                    </label>
-                    <div className="relative z-10">
-                      <CustomDropdown
-                        options={[
-                          { value: "10", label: "10" },
-                          { value: "20", label: "20" },
-                          { value: "50", label: "50" },
-                          { value: "100", label: "100" },
-                        ]}
-                        value={limit.toString()}
-                        onChange={(value) => {
-                          const numValue =
-                            typeof value === "string"
-                              ? parseInt(value, 10)
-                              : value;
-                          setLimit(numValue || 10);
-                          setPage(1);
-                        }}
-                        className="w-20"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={!paginationMeta.hasPrevPage}
-                      className={`px-4 py-2.5 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold ${
-                        paginationMeta.hasPrevPage
-                          ? "bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/20 border border-gray-200"
-                          : "bg-gray-100/50 text-gray-400 cursor-not-allowed opacity-50"
-                      }`}
-                    >
-                      <FiChevronLeft className="w-4 h-4" />
-                      <span className="hidden sm:inline">Prev</span>
-                    </button>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from(
-                        { length: Math.min(7, paginationMeta.totalPages) },
-                        (_, i) => {
-                          let pageNum: number;
-                          if (paginationMeta.totalPages <= 7) {
-                            pageNum = i + 1;
-                          } else if (page <= 4) {
-                            pageNum = i + 1;
-                          } else if (page >= paginationMeta.totalPages - 3) {
-                            pageNum = paginationMeta.totalPages - 6 + i;
-                          } else {
-                            pageNum = page - 3 + i;
-                          }
-
-                          const isActive = pageNum === page;
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setPage(pageNum)}
-                              className={`min-w-[40px] h-10 rounded-xl transition-all duration-200 text-sm font-semibold ${
-                                isActive
-                                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 scale-110 ring-2 ring-indigo-300/50"
-                                  : "bg-white/60 backdrop-blur-sm text-gray-700 hover:bg-white hover:scale-105 hover:shadow-md border border-gray-200"
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        }
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() =>
-                        setPage((p) =>
-                          Math.min(paginationMeta.totalPages, p + 1)
-                        )
-                      }
-                      disabled={!paginationMeta.hasNextPage}
-                      className={`px-4 py-2.5 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold ${
-                        paginationMeta.hasNextPage
-                          ? "bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/20 border border-gray-200"
-                          : "bg-gray-100/50 text-gray-400 cursor-not-allowed opacity-50"
-                      }`}
-                    >
-                      <span className="hidden sm:inline">Next</span>
-                      <FiChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+              {paginationMeta && (
+                <Pagination
+                  paginationMeta={paginationMeta}
+                  page={page}
+                  limit={limit}
+                  onPageChange={setPage}
+                  onLimitChange={(newLimit: number) => {
+                    setLimit(newLimit);
+                    setPage(1);
+                  }}
+                  itemName="fee categories"
+                />
               )}
             </>
           )}

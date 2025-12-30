@@ -32,7 +32,8 @@ export class CategoryHeadsController {
   @Post()
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new category head' })
-  @ApiResponse({ status: 201, description: 'Category head created successfully' })
+  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'School ID (optional for super admin)' })
+  @ApiOkResponse({ description: 'Category head created successfully', status: 201 })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   create(@Body() createCategoryHeadDto: CreateCategoryHeadDto, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
@@ -76,8 +77,9 @@ export class CategoryHeadsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get category head by ID' })
-  @ApiParam({ name: 'id', description: 'Category head ID' })
-  @ApiResponse({ status: 200, description: 'Category head found' })
+  @ApiParam({ name: 'id', description: 'Category head ID', type: Number })
+  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiOkResponse({ description: 'Category head found' })
   @ApiResponse({ status: 404, description: 'Category head not found' })
   findOne(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
@@ -89,9 +91,11 @@ export class CategoryHeadsController {
   @Patch(':id')
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update category head' })
-  @ApiParam({ name: 'id', description: 'Category head ID' })
-  @ApiResponse({ status: 200, description: 'Category head updated successfully' })
+  @ApiParam({ name: 'id', description: 'Category head ID', type: Number })
+  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiOkResponse({ description: 'Category head updated successfully' })
   @ApiResponse({ status: 404, description: 'Category head not found' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   update(
     @Param('id') id: string,
     @Body() updateCategoryHeadDto: UpdateCategoryHeadDto,
@@ -111,8 +115,9 @@ export class CategoryHeadsController {
   @Delete(':id')
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete category head' })
-  @ApiParam({ name: 'id', description: 'Category head ID' })
-  @ApiResponse({ status: 200, description: 'Category head deleted successfully' })
+  @ApiParam({ name: 'id', description: 'Category head ID', type: Number })
+  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiOkResponse({ description: 'Category head deleted successfully' })
   @ApiResponse({ status: 404, description: 'Category head not found' })
   @ApiResponse({ status: 400, description: 'Cannot delete - category head is in use' })
   remove(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {

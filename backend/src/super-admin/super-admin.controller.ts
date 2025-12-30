@@ -11,7 +11,17 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiOkResponse, ApiExtraModels, ApiParam, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiOkResponse,
+  ApiExtraModels,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
 import { SuperAdminService } from './super-admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -36,7 +46,16 @@ import { UpdateFeeStructureDto } from '../fee-structures/dto/update-fee-structur
 
 @ApiTags('Super Admin')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(PaginationDto, BulkImportStudentsDto, CreateFeeCategoryDto, UpdateFeeCategoryDto, CreateCategoryHeadDto, UpdateCategoryHeadDto, CreateFeeStructureDto, UpdateFeeStructureDto)
+@ApiExtraModels(
+  PaginationDto,
+  BulkImportStudentsDto,
+  CreateFeeCategoryDto,
+  UpdateFeeCategoryDto,
+  CreateCategoryHeadDto,
+  UpdateCategoryHeadDto,
+  CreateFeeStructureDto,
+  UpdateFeeStructureDto,
+)
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN)
@@ -57,28 +76,28 @@ export class SuperAdminController {
 
   @Get('schools')
   @ApiOperation({ summary: 'Get all schools with pagination (Super Admin only)' })
-  @ApiQuery({ 
-    name: 'page', 
-    required: false, 
-    type: Number, 
-    description: 'Page number (default: 1, minimum: 1)', 
-    example: 1 
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1, minimum: 1)',
+    example: 1,
   })
-  @ApiQuery({ 
-    name: 'limit', 
-    required: false, 
-    type: Number, 
-    description: 'Items per page (default: 10, minimum: 1, maximum: 100)', 
-    example: 10 
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, minimum: 1, maximum: 100)',
+    example: 10,
   })
-  @ApiQuery({ 
-    name: 'status', 
-    required: false, 
-    type: String, 
-    description: 'Filter by status (active, inactive, suspended)', 
-    example: 'active' 
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'Filter by status (active, inactive, suspended)',
+    example: 'active',
   })
-  @ApiOkResponse({ 
+  @ApiOkResponse({
     type: PaginatedSchoolResponseDto,
     description: 'Paginated list of schools',
     schema: {
@@ -93,8 +112,8 @@ export class SuperAdminController {
             address: '123 Main St',
             status: 'active',
             createdAt: '2024-01-01T00:00:00.000Z',
-            updatedAt: '2024-01-01T00:00:00.000Z'
-          }
+            updatedAt: '2024-01-01T00:00:00.000Z',
+          },
         ],
         meta: {
           total: 100,
@@ -102,16 +121,16 @@ export class SuperAdminController {
           limit: 10,
           totalPages: 10,
           hasNextPage: true,
-          hasPrevPage: false
-        }
-      }
-    }
+          hasPrevPage: false,
+        },
+      },
+    },
   })
   getAllSchools(@Query() paginationDto: PaginationDto) {
     const page = paginationDto.page || 1;
     const limit = paginationDto.limit || 10;
     const status = paginationDto.status;
-    
+
     return this.superAdminService.getAllSchools(page, limit, status);
   }
 
@@ -124,8 +143,10 @@ export class SuperAdminController {
   }
 
   @Get('schools/:id/details')
-  @ApiOperation({ summary: 'Get comprehensive school details with all related data (Super Admin only)' })
-  @ApiOkResponse({ 
+  @ApiOperation({
+    summary: 'Get comprehensive school details with all related data (Super Admin only)',
+  })
+  @ApiOkResponse({
     description: 'School details with students, users, payments, and fee structures',
     schema: {
       example: {
@@ -134,7 +155,7 @@ export class SuperAdminController {
           name: 'ABC School',
           subdomain: 'abc-school',
           email: 'info@abcschool.com',
-          status: 'active'
+          status: 'active',
         },
         students: [],
         users: [],
@@ -148,10 +169,10 @@ export class SuperAdminController {
           completedPayments: 0,
           totalRevenue: 0,
           totalFeeStructures: 0,
-          activeFeeStructures: 0
-        }
-      }
-    }
+          activeFeeStructures: 0,
+        },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'School not found' })
   getSchoolDetails(@Param('id') id: string) {
@@ -161,7 +182,11 @@ export class SuperAdminController {
   @Get('schools/:id/classes')
   @ApiOperation({ summary: 'Get unique classes for a school (Super Admin only)' })
   @ApiParam({ name: 'id', description: 'School ID', type: Number })
-  @ApiResponse({ status: 200, description: 'List of unique classes', schema: { type: 'array', items: { type: 'string' } } })
+  @ApiResponse({
+    status: 200,
+    description: 'List of unique classes',
+    schema: { type: 'array', items: { type: 'string' } },
+  })
   @ApiResponse({ status: 404, description: 'School not found' })
   getSchoolClasses(@Param('id') id: string) {
     return this.superAdminService.getSchoolClasses(+id);
@@ -187,7 +212,8 @@ export class SuperAdminController {
   @Post('schools/:id/students/bulk-import')
   @ApiOperation({
     summary: 'Bulk import students for a school (Super Admin only)',
-    description: 'Import multiple students at once for a specific school. Returns success/failure counts and detailed errors.',
+    description:
+      'Import multiple students at once for a specific school. Returns success/failure counts and detailed errors.',
   })
   @ApiOkResponse({
     description: 'Bulk import completed',
@@ -215,10 +241,7 @@ export class SuperAdminController {
   })
   @ApiResponse({ status: 404, description: 'School not found' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  bulkImportStudents(
-    @Param('id') id: string,
-    @Body() bulkImportDto: BulkImportStudentsDto,
-  ) {
+  bulkImportStudents(@Param('id') id: string, @Body() bulkImportDto: BulkImportStudentsDto) {
     return this.superAdminService.bulkImportStudents(+id, bulkImportDto);
   }
 
@@ -232,28 +255,28 @@ export class SuperAdminController {
 
   @Get('users')
   @ApiOperation({ summary: 'Get all users with pagination and search (Super Admin only)' })
-  @ApiQuery({ 
-    name: 'page', 
-    required: false, 
-    type: Number, 
-    description: 'Page number (default: 1, minimum: 1)', 
-    example: 1 
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1, minimum: 1)',
+    example: 1,
   })
-  @ApiQuery({ 
-    name: 'limit', 
-    required: false, 
-    type: Number, 
-    description: 'Items per page (default: 10, minimum: 1, maximum: 100)', 
-    example: 10 
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, minimum: 1, maximum: 100)',
+    example: 10,
   })
-  @ApiQuery({ 
-    name: 'search', 
-    required: false, 
-    type: String, 
-    description: 'Search query to filter by name or email', 
-    example: 'john' 
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search query to filter by name or email',
+    example: 'john',
   })
-  @ApiOkResponse({ 
+  @ApiOkResponse({
     description: 'Paginated list of users',
     schema: {
       example: {
@@ -265,8 +288,8 @@ export class SuperAdminController {
             role: 'administrator',
             schoolId: 1,
             createdAt: '2024-01-01T00:00:00.000Z',
-            updatedAt: '2024-01-01T00:00:00.000Z'
-          }
+            updatedAt: '2024-01-01T00:00:00.000Z',
+          },
         ],
         meta: {
           total: 100,
@@ -274,16 +297,16 @@ export class SuperAdminController {
           limit: 10,
           totalPages: 10,
           hasNextPage: true,
-          hasPrevPage: false
-        }
-      }
-    }
+          hasPrevPage: false,
+        },
+      },
+    },
   })
   getAllUsers(@Query() paginationDto: PaginationDto) {
     const page = paginationDto.page || 1;
     const limit = paginationDto.limit || 10;
     const search = paginationDto.search;
-    
+
     return this.superAdminService.getAllUsers(page, limit, search);
   }
 
@@ -402,6 +425,7 @@ export class SuperAdminController {
 
   @Post('fee-categories')
   @ApiOperation({ summary: 'Create a new fee category (Super Admin only)' })
+  @ApiQuery({ name: 'schoolId', required: true, type: Number, description: 'School ID' })
   @ApiBody({ type: CreateFeeCategoryDto })
   @ApiResponse({ status: 201, description: 'Fee category created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
@@ -418,7 +442,13 @@ export class SuperAdminController {
 
   @Patch('fee-categories/:id')
   @ApiOperation({ summary: 'Update fee category (Super Admin only)' })
-  @ApiParam({ name: 'id', description: 'Fee category ID' })
+  @ApiParam({ name: 'id', description: 'Fee category ID', type: Number })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional)',
+  })
   @ApiBody({ type: UpdateFeeCategoryDto })
   @ApiResponse({ status: 200, description: 'Fee category updated successfully' })
   @ApiResponse({ status: 404, description: 'Fee category not found' })
@@ -436,17 +466,20 @@ export class SuperAdminController {
 
   @Delete('fee-categories/:id')
   @ApiOperation({ summary: 'Delete fee category (Super Admin only)' })
-  @ApiParam({ name: 'id', description: 'Fee category ID' })
+  @ApiParam({ name: 'id', description: 'Fee category ID', type: Number })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional)',
+  })
   @ApiResponse({ status: 200, description: 'Fee category deleted successfully' })
   @ApiResponse({ status: 404, description: 'Fee category not found' })
   @ApiResponse({
     status: 400,
     description: 'Bad request - fee category has associated fee structures',
   })
-  deleteFeeCategory(
-    @Param('id') id: string,
-    @Query('schoolId') schoolId?: string,
-  ) {
+  deleteFeeCategory(@Param('id') id: string, @Query('schoolId') schoolId?: string) {
     return this.superAdminService.deleteFeeCategory(+id, schoolId ? +schoolId : undefined);
   }
 
@@ -565,15 +598,91 @@ export class SuperAdminController {
 
   // ========== FEE STRUCTURES (FEE PLANS) MANAGEMENT ==========
   @Get('fee-structures')
-  @ApiOperation({ summary: 'Get all fee structures/plans (Super Admin only)' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or description' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID' })
-  @ApiQuery({ name: 'feeCategoryId', required: false, type: Number, description: 'Filter by fee category ID' })
-  @ApiQuery({ name: 'categoryHeadId', required: false, type: Number, description: 'Filter by category head ID' })
-  @ApiQuery({ name: 'academicYear', required: false, type: String, description: 'Filter by academic year' })
-  @ApiResponse({ status: 200, description: 'List of fee structures' })
+  @ApiOperation({ summary: 'Get all fee structures/plans with pagination (Super Admin only)' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1, minimum: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, minimum: 1, maximum: 100)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by name or description',
+    example: 'tuition',
+  })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'feeCategoryId',
+    required: false,
+    type: Number,
+    description: 'Filter by fee category ID',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'categoryHeadId',
+    required: false,
+    type: Number,
+    description: 'Filter by category head ID',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'academicYear',
+    required: false,
+    type: String,
+    description: 'Filter by academic year',
+    example: '2024-2025',
+  })
+  @ApiOkResponse({
+    description: 'Paginated list of fee structures',
+    schema: {
+      example: {
+        data: [
+          {
+            id: 1,
+            name: 'Tuition Fee Plan - Grade 1',
+            description: 'Monthly tuition fee',
+            amount: 5000,
+            class: 'Grade 1',
+            academicYear: '2024-2025',
+            dueDate: '2024-12-31',
+            status: 'active',
+            schoolId: 1,
+            feeCategoryId: 1,
+            categoryHeadId: 1,
+            school: { id: 1, name: 'Example School' },
+            category: { id: 1, name: 'Tuition Fee' },
+            categoryHead: { id: 1, name: 'General' },
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+        meta: {
+          total: 10,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      },
+    },
+  })
   getAllFeeStructures(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -596,8 +705,8 @@ export class SuperAdminController {
 
   @Get('fee-structures/:id')
   @ApiOperation({ summary: 'Get fee structure by ID (Super Admin only)' })
-  @ApiParam({ name: 'id', description: 'Fee structure ID' })
-  @ApiResponse({ status: 200, description: 'Fee structure found' })
+  @ApiParam({ name: 'id', description: 'Fee structure ID', type: Number })
+  @ApiOkResponse({ description: 'Fee structure found' })
   @ApiResponse({ status: 404, description: 'Fee structure not found' })
   getFeeStructureById(@Param('id') id: string) {
     return this.superAdminService.getFeeStructureById(+id);
@@ -605,9 +714,15 @@ export class SuperAdminController {
 
   @Post('fee-structures')
   @ApiOperation({ summary: 'Create a new fee structure/plan (Super Admin only)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: true,
+    type: Number,
+    description: 'School ID',
+    example: 1,
+  })
   @ApiBody({ type: CreateFeeStructureDto })
-  @ApiQuery({ name: 'schoolId', required: true, type: Number, description: 'School ID' })
-  @ApiResponse({ status: 201, description: 'Fee structure created successfully' })
+  @ApiOkResponse({ description: 'Fee structure created successfully', status: 201 })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 404, description: 'School or fee category not found' })
   createFeeStructure(
@@ -622,11 +737,18 @@ export class SuperAdminController {
 
   @Patch('fee-structures/:id')
   @ApiOperation({ summary: 'Update fee structure/plan (Super Admin only)' })
-  @ApiParam({ name: 'id', description: 'Fee structure ID' })
+  @ApiParam({ name: 'id', description: 'Fee structure ID', type: Number })
+  @ApiQuery({
+    name: 'schoolId',
+    required: true,
+    type: Number,
+    description: 'School ID',
+    example: 1,
+  })
   @ApiBody({ type: UpdateFeeStructureDto })
-  @ApiQuery({ name: 'schoolId', required: true, type: Number, description: 'School ID' })
-  @ApiResponse({ status: 200, description: 'Fee structure updated successfully' })
+  @ApiOkResponse({ description: 'Fee structure updated successfully' })
   @ApiResponse({ status: 404, description: 'Fee structure not found' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   updateFeeStructure(
     @Param('id') id: string,
     @Body() updateFeeStructureDto: UpdateFeeStructureDto,
@@ -640,9 +762,15 @@ export class SuperAdminController {
 
   @Delete('fee-structures/:id')
   @ApiOperation({ summary: 'Delete fee structure/plan (Super Admin only)' })
-  @ApiParam({ name: 'id', description: 'Fee structure ID' })
-  @ApiQuery({ name: 'schoolId', required: true, type: Number, description: 'School ID' })
-  @ApiResponse({ status: 200, description: 'Fee structure deleted successfully' })
+  @ApiParam({ name: 'id', description: 'Fee structure ID', type: Number })
+  @ApiQuery({
+    name: 'schoolId',
+    required: true,
+    type: Number,
+    description: 'School ID',
+    example: 1,
+  })
+  @ApiOkResponse({ description: 'Fee structure deleted successfully' })
   @ApiResponse({ status: 404, description: 'Fee structure not found' })
   @ApiResponse({ status: 400, description: 'Cannot delete - fee structure is in use' })
   removeFeeStructure(@Param('id') id: string, @Query('schoolId') schoolId: string) {
@@ -652,4 +780,3 @@ export class SuperAdminController {
     return this.superAdminService.removeFeeStructure(+id, +schoolId);
   }
 }
-
