@@ -77,7 +77,7 @@ export class CategoryHeadsService {
 
     const categoryHead = await this.categoryHeadsRepository.findOne({
       where,
-      relations: ['school', 'feeCategories'],
+      relations: ['school', 'feeStructures'],
     });
 
     if (!categoryHead) {
@@ -121,10 +121,10 @@ export class CategoryHeadsService {
   async remove(id: number, schoolId?: number): Promise<void> {
     const categoryHead = await this.findOne(id, schoolId);
 
-    // Check if category head is being used by any fee categories
-    if (categoryHead.feeCategories && categoryHead.feeCategories.length > 0) {
+    // Check if category head is being used by any fee structures
+    if (categoryHead.feeStructures && categoryHead.feeStructures.length > 0) {
       throw new BadRequestException(
-        `Cannot delete category head. It is being used by ${categoryHead.feeCategories.length} fee category(ies)`,
+        `Cannot delete category head. It is being used by ${categoryHead.feeStructures.length} fee structure(s)`,
       );
     }
 

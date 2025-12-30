@@ -18,7 +18,6 @@ interface FeeCategory {
   description?: string;
   type: "school" | "transport";
   status: string;
-  categoryHead?: "general" | "sponsored"; // General or Sponsored
   applicableMonths?: number[]; // Array of month numbers (1-12)
   schoolId: number;
   school?: {
@@ -623,9 +622,6 @@ export default function FeeHeading() {
                         Type
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Category Head
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         Applicable Months
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
@@ -666,19 +662,6 @@ export default function FeeHeading() {
                             {category.type === "transport"
                               ? "Transport"
                               : "School"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                              category.categoryHead === "sponsored"
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {category.categoryHead === "sponsored"
-                              ? "Sponsored"
-                              : "General"}
                           </span>
                         </td>
                         <td className="px-4 py-3">

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { School } from '../../schools/entities/school.entity';
 import { FeeCategory } from '../../fee-categories/entities/fee-category.entity';
+import { CategoryHead } from '../../category-heads/entities/category-head.entity';
 import { Payment } from '../../payments/entities/payment.entity';
 import { StudentFeeStructure } from '../../student-fee-structures/entities/student-fee-structure.entity';
 
@@ -25,6 +26,9 @@ export class FeeStructure {
 
   @Column()
   feeCategoryId!: number;
+
+  @Column({ nullable: true })
+  categoryHeadId?: number;
 
   @Column({ length: 255 })
   name!: string;
@@ -61,6 +65,10 @@ export class FeeStructure {
   @ManyToOne(() => FeeCategory, (category) => category.feeStructures)
   @JoinColumn({ name: 'feeCategoryId' })
   category!: FeeCategory;
+
+  @ManyToOne(() => CategoryHead, { nullable: true })
+  @JoinColumn({ name: 'categoryHeadId' })
+  categoryHead?: CategoryHead;
 
   @OneToMany(() => Payment, (payment) => payment.feeStructure)
   payments!: Payment[];

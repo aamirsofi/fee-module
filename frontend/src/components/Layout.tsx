@@ -2,11 +2,11 @@ import { ReactNode, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import {
-  FiHome,
-  FiUsers,
-  FiDollarSign,
-  FiCreditCard,
+import { 
+  FiHome, 
+  FiUsers, 
+  FiDollarSign, 
+  FiCreditCard, 
   FiMapPin,
   FiLogOut,
   FiUser,
@@ -41,7 +41,6 @@ export default function Layout({ children }: LayoutProps) {
     users: true,
     settings: false,
     "fee-settings": false,
-    "fee-heads": false,
     analytics: false,
     reports: false,
   });
@@ -155,26 +154,19 @@ export default function Layout({ children }: LayoutProps) {
               icon: FiTag,
             },
             {
-              name: "Fee Heads",
+              name: "Fee Heading",
+              path: "/super-admin/settings/fee-settings/fee-heads/fee-heading",
               icon: FiDollarSign,
-              section: "fee-heads",
-              children: [
-                {
-                  name: "Fee Heading",
-                  path: "/super-admin/settings/fee-settings/fee-heads/fee-heading",
-                  icon: FiDollarSign,
-                },
-                {
-                  name: "Fee Plan",
-                  path: "/super-admin/settings/fee-settings/fee-heads/fee-plan",
-                  icon: FiCreditCard,
-                },
-                {
-                  name: "Route Plan",
-                  path: "/super-admin/settings/fee-settings/fee-heads/route-plan",
-                  icon: FiMapPin,
-                },
-              ],
+            },
+            {
+              name: "Fee Plan",
+              path: "/super-admin/settings/fee-settings/fee-heads/fee-plan",
+              icon: FiCreditCard,
+            },
+            {
+              name: "Route Plan",
+              path: "/super-admin/settings/fee-settings/fee-heads/route-plan",
+              icon: FiMapPin,
             },
           ],
         },
@@ -214,6 +206,19 @@ export default function Layout({ children }: LayoutProps) {
     };
   }, []);
 
+  // Helper function to recursively check if any child is active
+  const hasActiveChildRecursive = (children: any[]): boolean => {
+    return children.some((child) => {
+      if (child.path && isActive(child.path)) {
+        return true;
+      }
+      if (child.children) {
+        return hasActiveChildRecursive(child.children);
+      }
+      return false;
+    });
+  };
+
   // Auto-expand only the active section, collapse all others
   useEffect(() => {
     if (isSuperAdmin) {
@@ -221,9 +226,8 @@ export default function Layout({ children }: LayoutProps) {
 
       superAdminSections.forEach((section) => {
         if (section.section && section.children) {
-          const hasActive = section.children.some((child) =>
-            isActive(child.path)
-          );
+          // Recursively check if any child (at any level) is active
+          const hasActive = hasActiveChildRecursive(section.children);
           // Only expand the section that has an active child, collapse all others
           newExpandedSections[section.section] = hasActive;
         }

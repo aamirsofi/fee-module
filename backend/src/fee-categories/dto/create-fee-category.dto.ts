@@ -24,16 +24,6 @@ export class CreateFeeCategoryDto {
   @IsOptional()
   status?: CategoryStatus;
 
-  @ApiProperty({ 
-    required: false, 
-    type: Number,
-    description: 'Category Head ID (references a category head created separately)',
-    example: 1
-  })
-  @IsInt()
-  @IsOptional()
-  categoryHeadId?: number;
-
   @ApiProperty({
     required: false,
     description: 'Array of applicable months (1-12). Empty array means applicable to all months.',

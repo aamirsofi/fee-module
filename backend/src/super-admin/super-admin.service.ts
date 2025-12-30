@@ -622,7 +622,6 @@ export class SuperAdminService {
       ...createFeeCategoryDto,
       name: createFeeCategoryDto.name.trim(),
       type: createFeeCategoryDto.type || FeeCategoryType.SCHOOL,
-      categoryHeadId: createFeeCategoryDto.categoryHeadId,
       schoolId,
     });
 

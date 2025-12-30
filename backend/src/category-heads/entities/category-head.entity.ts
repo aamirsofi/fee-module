@@ -9,7 +9,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { School } from '../../schools/entities/school.entity';
-import { FeeCategory } from '../../fee-categories/entities/fee-category.entity';
+import { FeeStructure } from '../../fee-structures/entities/fee-structure.entity';
 
 export enum CategoryHeadStatus {
   ACTIVE = 'active',
@@ -41,8 +41,8 @@ export class CategoryHead {
   @JoinColumn({ name: 'schoolId' })
   school!: School;
 
-  @OneToMany(() => FeeCategory, (feeCategory) => feeCategory.categoryHead)
-  feeCategories!: FeeCategory[];
+  @OneToMany(() => FeeStructure, (feeStructure) => feeStructure.categoryHead)
+  feeStructures!: FeeStructure[];
 
   @CreateDateColumn()
   createdAt!: Date;

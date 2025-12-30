@@ -10,7 +10,6 @@ import {
 } from 'typeorm';
 import { School } from '../../schools/entities/school.entity';
 import { FeeStructure } from '../../fee-structures/entities/fee-structure.entity';
-import { CategoryHead } from '../../category-heads/entities/category-head.entity';
 
 export enum CategoryStatus {
   ACTIVE = 'active',
@@ -46,13 +45,6 @@ export class FeeCategory {
     default: CategoryStatus.ACTIVE,
   })
   status!: CategoryStatus;
-
-  @Column({ nullable: true })
-  categoryHeadId?: number;
-
-  @ManyToOne(() => CategoryHead, (categoryHead) => categoryHead.feeCategories, { nullable: true })
-  @JoinColumn({ name: 'categoryHeadId' })
-  categoryHead?: CategoryHead;
 
   @Column({ type: 'json', nullable: true })
   applicableMonths?: number[]; // Array of month numbers (1-12), e.g., [1,2,3,4,5,6,7,8,9,10,11,12] for all months
