@@ -66,7 +66,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiResponse({ status: 200, description: 'User found' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  findOne(@Param('id') id: string, @Request() req: any) {
+  findOne(@Param('id') id: string) {
     return this.usersService.findOne(+id);
   }
 
@@ -107,4 +107,3 @@ export class UsersController {
     return this.usersService.remove(+id);
   }
 }
-

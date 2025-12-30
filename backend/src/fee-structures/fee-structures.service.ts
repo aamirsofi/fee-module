@@ -12,7 +12,10 @@ export class FeeStructuresService {
     private feeStructuresRepository: Repository<FeeStructure>,
   ) {}
 
-  async create(createFeeStructureDto: CreateFeeStructureDto, schoolId: number): Promise<FeeStructure> {
+  async create(
+    createFeeStructureDto: CreateFeeStructureDto,
+    schoolId: number,
+  ): Promise<FeeStructure> {
     const feeStructure = this.feeStructuresRepository.create({
       ...createFeeStructureDto,
       schoolId,
@@ -50,7 +53,11 @@ export class FeeStructuresService {
     return feeStructure;
   }
 
-  async update(id: number, updateFeeStructureDto: UpdateFeeStructureDto, schoolId?: number): Promise<FeeStructure> {
+  async update(
+    id: number,
+    updateFeeStructureDto: UpdateFeeStructureDto,
+    schoolId?: number,
+  ): Promise<FeeStructure> {
     const feeStructure = await this.findOne(id, schoolId);
     const updateData: any = { ...updateFeeStructureDto };
     if (updateFeeStructureDto.dueDate) {
@@ -65,4 +72,3 @@ export class FeeStructuresService {
     await this.feeStructuresRepository.remove(feeStructure);
   }
 }
-

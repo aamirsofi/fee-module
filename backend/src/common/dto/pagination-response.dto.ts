@@ -27,4 +27,3 @@ export class PaginatedResponseDto<T> {
   @ApiProperty({ type: PaginationMetaDto, description: 'Pagination metadata' })
   meta!: PaginationMetaDto;
 }
-

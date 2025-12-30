@@ -25,7 +25,9 @@ export class StudentsService {
       where: { id: schoolId },
     });
     if (!school) {
-      throw new BadRequestException(`School with ID ${schoolId} does not exist. Please ensure you have a valid school assigned.`);
+      throw new BadRequestException(
+        `School with ID ${schoolId} does not exist. Please ensure you have a valid school assigned.`,
+      );
     }
 
     // Validate required fields
@@ -50,7 +52,9 @@ export class StudentsService {
       where: { studentId: createStudentDto.studentId.trim(), schoolId },
     });
     if (existingStudentId) {
-      throw new BadRequestException(`Student ID "${createStudentDto.studentId}" already exists for this school`);
+      throw new BadRequestException(
+        `Student ID "${createStudentDto.studentId}" already exists for this school`,
+      );
     }
 
     // Check if email already exists for this school
@@ -58,13 +62,15 @@ export class StudentsService {
       where: { email: createStudentDto.email.trim().toLowerCase(), schoolId },
     });
     if (existingEmail) {
-      throw new BadRequestException(`Email "${createStudentDto.email}" already exists for this school`);
+      throw new BadRequestException(
+        `Email "${createStudentDto.email}" already exists for this school`,
+      );
     }
 
     try {
       // Ensure status is set (default to ACTIVE if not provided)
       const status = createStudentDto.status || 'active';
-      
+
       const student = this.studentsRepository.create({
         studentId: createStudentDto.studentId.trim(),
         firstName: createStudentDto.firstName.trim(),
@@ -85,33 +91,39 @@ export class StudentsService {
       console.error('Error detail:', error.detail);
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
-      
+
       // Handle database constraint violations
-      if (error.code === '23505') { // PostgreSQL unique violation
+      if (error.code === '23505') {
+        // PostgreSQL unique violation
         if (error.detail?.includes('studentId') || error.detail?.includes('student_id')) {
-          throw new BadRequestException(`Student ID "${createStudentDto.studentId}" already exists`);
+          throw new BadRequestException(
+            `Student ID "${createStudentDto.studentId}" already exists`,
+          );
         }
         if (error.detail?.includes('email')) {
           throw new BadRequestException(`Email "${createStudentDto.email}" already exists`);
         }
         throw new BadRequestException('A student with this information already exists');
       }
-      
+
       // Handle other database errors
-      if (error.code === '23503') { // Foreign key violation
+      if (error.code === '23503') {
+        // Foreign key violation
         throw new BadRequestException('Invalid school ID or related record not found');
       }
-      
+
       // Handle validation errors
       if (error.name === 'QueryFailedError') {
         throw new BadRequestException(`Database error: ${error.message}`);
       }
-      
+
       // Re-throw other errors with more context
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new BadRequestException(`Failed to create student: ${error.message || 'Unknown error'}`);
+      throw new BadRequestException(
+        `Failed to create student: ${error.message || 'Unknown error'}`,
+      );
     }
   }
 
@@ -144,7 +156,11 @@ export class StudentsService {
     return student;
   }
 
-  async update(id: number, updateStudentDto: UpdateStudentDto, schoolId?: number): Promise<Student> {
+  async update(
+    id: number,
+    updateStudentDto: UpdateStudentDto,
+    schoolId?: number,
+  ): Promise<Student> {
     const student = await this.findOne(id, schoolId);
     Object.assign(student, updateStudentDto);
     return await this.studentsRepository.save(student);
@@ -155,4 +171,3 @@ export class StudentsService {
     await this.studentsRepository.remove(student);
   }
 }
-

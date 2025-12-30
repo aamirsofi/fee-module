@@ -12,4 +12,3 @@ import { School } from '../schools/entities/school.entity';
   exports: [StudentsService],
 })
 export class StudentsModule {}
-

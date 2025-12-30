@@ -38,8 +38,7 @@ async function createSuperAdmin() {
   process.exit(0);
 }
 
-createSuperAdmin().catch((error) => {
+createSuperAdmin().catch(error => {
   console.error('Error creating super admin:', error);
   process.exit(1);
 });
-

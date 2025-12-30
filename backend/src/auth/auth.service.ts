@@ -18,7 +18,7 @@ export class AuthService {
       if (!user) {
         return null;
       }
-      
+
       if (!user.password) {
         console.error('User found but password field is missing:', user);
         return null;
@@ -26,6 +26,7 @@ export class AuthService {
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (isPasswordValid) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password: _, ...result } = user;
         return result;
       }
@@ -43,9 +44,9 @@ export class AuthService {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      const payload = { 
-        email: user.email, 
-        sub: user.id, 
+      const payload = {
+        email: user.email,
+        sub: user.id,
         role: user.role,
         schoolId: user.schoolId,
       };
@@ -83,6 +84,7 @@ export class AuthService {
       password: hashedPassword,
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...userWithoutPassword } = user;
     return {
       message: 'User registered successfully',
@@ -90,4 +92,3 @@ export class AuthService {
     };
   }
 }
-

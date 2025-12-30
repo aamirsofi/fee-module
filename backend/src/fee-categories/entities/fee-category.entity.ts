@@ -52,11 +52,11 @@ export class FeeCategory {
   @Column()
   schoolId!: number;
 
-  @ManyToOne(() => School, (school) => school.feeCategories)
+  @ManyToOne(() => School, school => school.feeCategories)
   @JoinColumn({ name: 'schoolId' })
   school!: School;
 
-  @OneToMany(() => FeeStructure, (feeStructure) => feeStructure.category)
+  @OneToMany(() => FeeStructure, feeStructure => feeStructure.category)
   feeStructures!: FeeStructure[];
 
   @CreateDateColumn()
@@ -65,4 +65,3 @@ export class FeeCategory {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

@@ -12,10 +12,9 @@ import { UsersService } from '../users/users.service';
 import { Student, StudentStatus } from '../students/entities/student.entity';
 import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { FeeStructure } from '../fee-structures/entities/fee-structure.entity';
-import { FeeCategory, CategoryStatus, FeeCategoryType } from '../fee-categories/entities/fee-category.entity';
+import { FeeCategory, FeeCategoryType } from '../fee-categories/entities/fee-category.entity';
 import { getPaginationParams, createPaginatedResponse } from '../common/utils/pagination.util';
 import { BulkImportStudentsDto } from './dto/bulk-import-students.dto';
-import { CreateStudentDto } from '../students/dto/create-student.dto';
 import { CreateFeeCategoryDto } from '../fee-categories/dto/create-fee-category.dto';
 import { UpdateFeeCategoryDto } from '../fee-categories/dto/update-fee-category.dto';
 import { CreateFeeStructureDto } from '../fee-structures/dto/create-fee-structure.dto';
@@ -51,16 +50,16 @@ export class SuperAdminService {
   async getAllSchools(page: number = 1, limit: number = 10, status?: string) {
     try {
       const { skip, limit: take } = getPaginationParams(page, limit);
-      
+
       // Build where clause
       const whereConditions: any = {};
       if (status) {
         whereConditions.status = status as SchoolStatus;
       }
-      
+
       // Debug logging
       console.log('getAllSchools service called with:', { page, limit, skip, status });
-      
+
       const [schools, total] = await this.schoolsRepository.findAndCount({
         where: Object.keys(whereConditions).length > 0 ? whereConditions : undefined,
         relations: { createdBy: true },
@@ -140,9 +139,9 @@ export class SuperAdminService {
         .where('payment.schoolId = :schoolId', { schoolId: id })
         .andWhere('payment.status = :status', { status: PaymentStatus.COMPLETED })
         .getRawOne()
-        .then((result) => parseFloat(result?.total || '0')),
+        .then(result => parseFloat(result?.total || '0')),
       totalFeeStructures: feeStructures.length,
-      activeFeeStructures: feeStructures.filter((fs) => fs.status === 'active').length,
+      activeFeeStructures: feeStructures.filter(fs => fs.status === 'active').length,
     };
 
     return {
@@ -183,7 +182,7 @@ export class SuperAdminService {
       const hasAdmin = await this.hasAdministrator(createUserDto.schoolId);
       if (!hasAdmin) {
         throw new BadRequestException(
-          'Each school must have at least one administrator. Please assign an administrator role to this user or ensure the school has an existing administrator.'
+          'Each school must have at least one administrator. Please assign an administrator role to this user or ensure the school has an existing administrator.',
         );
       }
     }
@@ -193,7 +192,7 @@ export class SuperAdminService {
   async getAllUsers(page: number = 1, limit: number = 10, search?: string) {
     try {
       const { skip, limit: take } = getPaginationParams(page, limit);
-      
+
       // Build where clause - exclude super_admin users
       let whereConditions: any = {
         role: Not(UserRole.SUPER_ADMIN),
@@ -249,16 +248,20 @@ export class SuperAdminService {
 
   async updateUser(id: number, updateUserDto: UpdateUserDto) {
     const user = await this.usersService.findOne(id);
-    
+
     // Prevent changing SUPER_ADMIN role
-    if (user.role === UserRole.SUPER_ADMIN && updateUserDto.role && updateUserDto.role !== UserRole.SUPER_ADMIN) {
+    if (
+      user.role === UserRole.SUPER_ADMIN &&
+      updateUserDto.role &&
+      updateUserDto.role !== UserRole.SUPER_ADMIN
+    ) {
       throw new BadRequestException('Cannot change SUPER_ADMIN role');
     }
 
     // Check if changing role from administrator to something else
     const schoolId = updateUserDto.schoolId !== undefined ? updateUserDto.schoolId : user.schoolId;
     const newRole = updateUserDto.role !== undefined ? updateUserDto.role : user.role;
-    
+
     // If user is currently an administrator and role is being changed to non-administrator
     if (user.role === UserRole.ADMINISTRATOR && newRole !== UserRole.ADMINISTRATOR && schoolId) {
       // Count other administrators for this school (excluding current user)
@@ -272,7 +275,7 @@ export class SuperAdminService {
       // If this is the only administrator, prevent the change
       if (adminCount <= 1) {
         throw new BadRequestException(
-          'Cannot change role: Each school must have at least one administrator. Please assign another user as administrator first.'
+          'Cannot change role: Each school must have at least one administrator. Please assign another user as administrator first.',
         );
       }
     }
@@ -288,17 +291,22 @@ export class SuperAdminService {
 
       if (adminCount <= 1) {
         throw new BadRequestException(
-          'Cannot remove user from school: Each school must have at least one administrator. Please assign another user as administrator first.'
+          'Cannot remove user from school: Each school must have at least one administrator. Please assign another user as administrator first.',
         );
       }
     }
 
     // If schoolId is being changed and new role is not administrator, ensure new school has an administrator
-    if (updateUserDto.schoolId !== undefined && updateUserDto.schoolId !== null && updateUserDto.schoolId !== user.schoolId && newRole !== UserRole.ADMINISTRATOR) {
+    if (
+      updateUserDto.schoolId !== undefined &&
+      updateUserDto.schoolId !== null &&
+      updateUserDto.schoolId !== user.schoolId &&
+      newRole !== UserRole.ADMINISTRATOR
+    ) {
       const hasAdmin = await this.hasAdministrator(updateUserDto.schoolId);
       if (!hasAdmin) {
         throw new BadRequestException(
-          'Cannot assign user to this school: Each school must have at least one administrator. Please assign an administrator role to this user or ensure the school has an existing administrator.'
+          'Cannot assign user to this school: Each school must have at least one administrator. Please assign an administrator role to this user or ensure the school has an existing administrator.',
         );
       }
     }
@@ -308,7 +316,7 @@ export class SuperAdminService {
 
   async deleteUser(id: number) {
     const user = await this.usersService.findOne(id);
-    
+
     // Prevent deleting SUPER_ADMIN
     if (user.role === UserRole.SUPER_ADMIN) {
       throw new BadRequestException('Cannot delete SUPER_ADMIN user');
@@ -325,7 +333,7 @@ export class SuperAdminService {
 
       if (adminCount <= 1) {
         throw new BadRequestException(
-          'Cannot delete user: Each school must have at least one administrator. Please assign another user as administrator before deleting this user.'
+          'Cannot delete user: Each school must have at least one administrator. Please assign another user as administrator before deleting this user.',
         );
       }
     }
@@ -438,7 +446,7 @@ export class SuperAdminService {
         const duplicateInBatch = bulkImportDto.students
           .slice(0, i)
           .some(
-            (s) =>
+            s =>
               s.studentId?.trim().toLowerCase() === studentDto.studentId.trim().toLowerCase() ||
               s.email?.trim().toLowerCase() === studentDto.email.trim().toLowerCase(),
           );
@@ -578,10 +586,7 @@ export class SuperAdminService {
       }
     }
 
-    const [data, total] = await queryBuilder
-      .skip(skip)
-      .take(take)
-      .getManyAndCount();
+    const [data, total] = await queryBuilder.skip(skip).take(take).getManyAndCount();
 
     return createPaginatedResponse(data, total, page, take);
   }
@@ -648,9 +653,7 @@ export class SuperAdminService {
 
     // If schoolId is provided, verify it matches
     if (schoolId && feeCategory.schoolId !== schoolId) {
-      throw new BadRequestException(
-        `Fee category does not belong to school with ID ${schoolId}`,
-      );
+      throw new BadRequestException(`Fee category does not belong to school with ID ${schoolId}`);
     }
 
     // Check for duplicate name if name is being updated
@@ -689,9 +692,7 @@ export class SuperAdminService {
 
     // If schoolId is provided, verify it matches
     if (schoolId && feeCategory.schoolId !== schoolId) {
-      throw new BadRequestException(
-        `Fee category does not belong to school with ID ${schoolId}`,
-      );
+      throw new BadRequestException(`Fee category does not belong to school with ID ${schoolId}`);
     }
 
     // Check if fee category has associated fee structures
@@ -746,18 +747,14 @@ export class SuperAdminService {
 
     // Search by name or description
     if (search && search.trim()) {
-      queryBuilder.andWhere(
-        '(fs.name ILike :search OR fs.description ILike :search)',
-        { search: `%${search.trim()}%` },
-      );
+      queryBuilder.andWhere('(fs.name ILike :search OR fs.description ILike :search)', {
+        search: `%${search.trim()}%`,
+      });
     }
 
     queryBuilder.orderBy('fs.createdAt', 'DESC');
 
-    const [feeStructures, total] = await queryBuilder
-      .skip(skip)
-      .take(take)
-      .getManyAndCount();
+    const [feeStructures, total] = await queryBuilder.skip(skip).take(take).getManyAndCount();
 
     return createPaginatedResponse(feeStructures, total, page, limit);
   }
@@ -792,9 +789,7 @@ export class SuperAdminService {
       );
     }
     if (feeCategory.schoolId !== schoolId) {
-      throw new BadRequestException(
-        `Fee category does not belong to school with ID ${schoolId}`,
-      );
+      throw new BadRequestException(`Fee category does not belong to school with ID ${schoolId}`);
     }
 
     // Verify category head if provided
@@ -826,7 +821,7 @@ export class SuperAdminService {
       where: whereCondition,
     });
     if (existing) {
-      const yearText = createFeeStructureDto.academicYear 
+      const yearText = createFeeStructureDto.academicYear
         ? ` for academic year ${createFeeStructureDto.academicYear}`
         : '';
       throw new BadRequestException(
@@ -837,9 +832,7 @@ export class SuperAdminService {
     const feeStructure = this.feeStructuresRepository.create({
       ...createFeeStructureDto,
       schoolId,
-      dueDate: createFeeStructureDto.dueDate
-        ? new Date(createFeeStructureDto.dueDate)
-        : undefined,
+      dueDate: createFeeStructureDto.dueDate ? new Date(createFeeStructureDto.dueDate) : undefined,
     });
 
     return await this.feeStructuresRepository.save(feeStructure);
@@ -861,9 +854,7 @@ export class SuperAdminService {
 
     // Verify school matches
     if (feeStructure.schoolId !== schoolId) {
-      throw new BadRequestException(
-        `Fee structure does not belong to school with ID ${schoolId}`,
-      );
+      throw new BadRequestException(`Fee structure does not belong to school with ID ${schoolId}`);
     }
 
     // Verify fee category if being updated
@@ -877,9 +868,7 @@ export class SuperAdminService {
         );
       }
       if (feeCategory.schoolId !== schoolId) {
-        throw new BadRequestException(
-          `Fee category does not belong to school with ID ${schoolId}`,
-        );
+        throw new BadRequestException(`Fee category does not belong to school with ID ${schoolId}`);
       }
     }
 
@@ -946,9 +935,7 @@ export class SuperAdminService {
 
     // Verify school matches
     if (feeStructure.schoolId !== schoolId) {
-      throw new BadRequestException(
-        `Fee structure does not belong to school with ID ${schoolId}`,
-      );
+      throw new BadRequestException(`Fee structure does not belong to school with ID ${schoolId}`);
     }
 
     // Check if fee structure has associated student structures or payments
@@ -986,14 +973,9 @@ export class SuperAdminService {
 
     // Extract unique classes, filter out null/empty values, and sort
     const uniqueClasses = Array.from(
-      new Set(
-        students
-          .map((student) => student.class)
-          .filter((cls) => cls && cls.trim())
-      ),
+      new Set(students.map(student => student.class).filter(cls => cls && cls.trim())),
     ).sort() as string[];
 
     return uniqueClasses;
   }
 }
-

@@ -42,11 +42,11 @@ export class StudentFeeStructure {
   })
   status!: PaymentStatus;
 
-  @ManyToOne(() => Student, (student) => student.feeStructures)
+  @ManyToOne(() => Student, student => student.feeStructures)
   @JoinColumn({ name: 'studentId' })
   student!: Student;
 
-  @ManyToOne(() => FeeStructure, (feeStructure) => feeStructure.studentStructures)
+  @ManyToOne(() => FeeStructure, feeStructure => feeStructure.studentStructures)
   @JoinColumn({ name: 'feeStructureId' })
   feeStructure!: FeeStructure;
 
@@ -56,4 +56,3 @@ export class StudentFeeStructure {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

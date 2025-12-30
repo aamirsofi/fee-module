@@ -60,7 +60,7 @@ export class SchoolsService {
     });
 
     const savedUser = await this.usersRepository.save(adminUser);
-    
+
     // Log credentials (in production, send via email or secure channel)
     console.log(`\n✅ Default admin user created for school: ${school.name}`);
     console.log(`📧 Email: ${defaultEmail}`);
@@ -107,4 +107,3 @@ export class SchoolsService {
     await this.schoolsRepository.remove(school);
   }
 }
-

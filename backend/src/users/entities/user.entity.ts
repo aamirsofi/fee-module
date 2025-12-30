@@ -54,7 +54,7 @@ export class User {
   @JoinColumn({ name: 'schoolId' })
   school?: School;
 
-  @OneToMany(() => School, (school) => school.createdBy)
+  @OneToMany(() => School, school => school.createdBy)
   schools!: School[];
 
   @CreateDateColumn()
@@ -63,4 +63,3 @@ export class User {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

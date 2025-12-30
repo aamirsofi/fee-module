@@ -77,4 +77,3 @@ export class PaymentsController {
     return this.paymentsService.remove(+id, schoolId);
   }
 }
-

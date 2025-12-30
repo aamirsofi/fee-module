@@ -11,4 +11,3 @@ import { FeeStructure } from './entities/fee-structure.entity';
   exports: [FeeStructuresService],
 })
 export class FeeStructuresModule {}
-

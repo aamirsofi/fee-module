@@ -11,4 +11,3 @@ import { Payment } from './entities/payment.entity';
   exports: [PaymentsService],
 })
 export class PaymentsModule {}
-

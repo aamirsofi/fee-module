@@ -66,4 +66,3 @@ export class SchoolsController {
     return this.schoolsService.remove(+id);
   }
 }
-

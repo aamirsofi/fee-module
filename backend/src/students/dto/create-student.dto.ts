@@ -50,4 +50,3 @@ export class CreateStudentDto {
   @IsOptional()
   userId?: number;
 }
-

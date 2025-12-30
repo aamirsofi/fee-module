@@ -58,11 +58,11 @@ export class FeeStructure {
   @Column()
   schoolId!: number;
 
-  @ManyToOne(() => School, (school) => school.feeStructures)
+  @ManyToOne(() => School, school => school.feeStructures)
   @JoinColumn({ name: 'schoolId' })
   school!: School;
 
-  @ManyToOne(() => FeeCategory, (category) => category.feeStructures)
+  @ManyToOne(() => FeeCategory, category => category.feeStructures)
   @JoinColumn({ name: 'feeCategoryId' })
   category!: FeeCategory;
 
@@ -70,10 +70,10 @@ export class FeeStructure {
   @JoinColumn({ name: 'categoryHeadId' })
   categoryHead?: CategoryHead;
 
-  @OneToMany(() => Payment, (payment) => payment.feeStructure)
+  @OneToMany(() => Payment, payment => payment.feeStructure)
   payments!: Payment[];
 
-  @OneToMany(() => StudentFeeStructure, (sf) => sf.feeStructure)
+  @OneToMany(() => StudentFeeStructure, sf => sf.feeStructure)
   studentStructures!: StudentFeeStructure[];
 
   @CreateDateColumn()
@@ -82,4 +82,3 @@ export class FeeStructure {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

@@ -28,7 +28,6 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 import { Class } from './entities/class.entity';
-import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('Classes')
 @ApiBearerAuth('JWT-auth')
@@ -40,10 +39,19 @@ export class ClassesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new class' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'School ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'School ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: Class, description: 'Class created successfully', status: 201 })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  create(@Body() createClassDto: CreateClassDto, @Request() req: any, @Query('schoolId') schoolId?: string) {
+  create(
+    @Body() createClassDto: CreateClassDto,
+    @Request() req: any,
+    @Query('schoolId') schoolId?: string,
+  ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
     const targetSchoolId = schoolId ? +schoolId : userSchoolId;
 
@@ -60,9 +68,20 @@ export class ClassesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all classes with pagination' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page', example: 10 })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page',
+    example: 10,
+  })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search term' })
   @ApiOkResponse({ description: 'Paginated list of classes' })
   findAll(
@@ -73,7 +92,11 @@ export class ClassesController {
     @Query('schoolId') schoolId?: string,
   ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('School ID is required');
@@ -90,12 +113,21 @@ export class ClassesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a class by ID' })
   @ApiParam({ name: 'id', description: 'Class ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: Class, description: 'Class found' })
   @ApiResponse({ status: 404, description: 'Class not found' })
   findOne(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     return this.classesService.findOne(+id, targetSchoolId);
   }
@@ -103,7 +135,12 @@ export class ClassesController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a class' })
   @ApiParam({ name: 'id', description: 'Class ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: Class, description: 'Class updated successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
@@ -114,7 +151,11 @@ export class ClassesController {
     @Query('schoolId') schoolId?: string,
   ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('School ID is required');
@@ -126,13 +167,22 @@ export class ClassesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a class' })
   @ApiParam({ name: 'id', description: 'Class ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ description: 'Class deleted successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
   @ApiResponse({ status: 400, description: 'Bad request - cannot delete class with students' })
   remove(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('School ID is required');
@@ -141,4 +191,3 @@ export class ClassesController {
     return this.classesService.remove(+id, targetSchoolId!);
   }
 }
-

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository } from 'typeorm';
 import { CategoryHead } from './entities/category-head.entity';
 import { CreateCategoryHeadDto } from './dto/create-category-head.dto';
 import { UpdateCategoryHeadDto } from './dto/update-category-head.dto';
@@ -13,7 +13,10 @@ export class CategoryHeadsService {
     private categoryHeadsRepository: Repository<CategoryHead>,
   ) {}
 
-  async create(createCategoryHeadDto: CreateCategoryHeadDto, schoolId: number): Promise<CategoryHead> {
+  async create(
+    createCategoryHeadDto: CreateCategoryHeadDto,
+    schoolId: number,
+  ): Promise<CategoryHead> {
     // Check for duplicate name within the same school
     const existing = await this.categoryHeadsRepository.findOne({
       where: {
@@ -37,12 +40,7 @@ export class CategoryHeadsService {
     return await this.categoryHeadsRepository.save(categoryHead);
   }
 
-  async findAll(
-    page: number = 1,
-    limit: number = 10,
-    search?: string,
-    schoolId?: number,
-  ) {
+  async findAll(page: number = 1, limit: number = 10, search?: string, schoolId?: number) {
     const { skip, limit: take } = getPaginationParams(page, limit);
 
     const queryBuilder = this.categoryHeadsRepository
@@ -131,4 +129,3 @@ export class CategoryHeadsService {
     await this.categoryHeadsRepository.remove(categoryHead);
   }
 }
-

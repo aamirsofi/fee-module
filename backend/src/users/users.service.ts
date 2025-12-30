@@ -24,11 +24,18 @@ export class UsersService {
       return await this.usersRepository.save(user);
     } catch (error: any) {
       // Handle PostgreSQL unique constraint violations (error code 23505)
-      if (error.code === '23505' || (error instanceof QueryFailedError && error.message.includes('unique constraint'))) {
+      if (
+        error.code === '23505' ||
+        (error instanceof QueryFailedError && error.message.includes('unique constraint'))
+      ) {
         // Check error detail for specific field information
         const errorDetail = error.detail || error.message || '';
-        
-        if (errorDetail.includes('email') || errorDetail.includes('UQ_') || error.message.includes('email')) {
+
+        if (
+          errorDetail.includes('email') ||
+          errorDetail.includes('UQ_') ||
+          error.message.includes('email')
+        ) {
           throw new ConflictException(`A user with email "${createUserDto.email}" already exists.`);
         }
         // Generic unique constraint violation
@@ -75,7 +82,7 @@ export class UsersService {
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
-    
+
     // Check if email is being changed and if it already exists
     if (updateUserDto.email && updateUserDto.email !== user.email) {
       const existingUser = await this.findByEmail(updateUserDto.email);
@@ -83,18 +90,27 @@ export class UsersService {
         throw new ConflictException(`A user with email "${updateUserDto.email}" already exists.`);
       }
     }
-    
+
     try {
       Object.assign(user, updateUserDto);
       return await this.usersRepository.save(user);
     } catch (error: any) {
       // Handle PostgreSQL unique constraint violations (error code 23505)
-      if (error.code === '23505' || (error instanceof QueryFailedError && error.message.includes('unique constraint'))) {
+      if (
+        error.code === '23505' ||
+        (error instanceof QueryFailedError && error.message.includes('unique constraint'))
+      ) {
         // Check error detail for specific field information
         const errorDetail = error.detail || error.message || '';
-        
-        if (errorDetail.includes('email') || errorDetail.includes('UQ_') || error.message.includes('email')) {
-          throw new ConflictException(`A user with email "${updateUserDto.email || user.email}" already exists.`);
+
+        if (
+          errorDetail.includes('email') ||
+          errorDetail.includes('UQ_') ||
+          error.message.includes('email')
+        ) {
+          throw new ConflictException(
+            `A user with email "${updateUserDto.email || user.email}" already exists.`,
+          );
         }
         // Generic unique constraint violation
         throw new ConflictException('A record with the same unique value already exists.');
@@ -108,4 +124,3 @@ export class UsersService {
     await this.usersRepository.remove(user);
   }
 }
-

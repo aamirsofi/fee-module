@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsOptional, IsInt, Min, Max, IsString, IsEnum } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsString } from 'class-validator';
 
 export class PaginationDto {
   @ApiPropertyOptional({ default: 1, minimum: 1, description: 'Page number' })
@@ -23,7 +23,11 @@ export class PaginationDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by status (for schools)', enum: ['active', 'inactive', 'suspended'], example: 'active' })
+  @ApiPropertyOptional({
+    description: 'Filter by status (for schools)',
+    enum: ['active', 'inactive', 'suspended'],
+    example: 'active',
+  })
   @IsOptional()
   @IsString()
   status?: string;
@@ -42,4 +46,3 @@ export interface PaginatedResponse<T> {
   data: T[];
   meta: PaginationMeta;
 }
-

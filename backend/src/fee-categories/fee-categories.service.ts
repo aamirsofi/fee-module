@@ -49,7 +49,11 @@ export class FeeCategoriesService {
     return category;
   }
 
-  async update(id: number, updateFeeCategoryDto: UpdateFeeCategoryDto, schoolId?: number): Promise<FeeCategory> {
+  async update(
+    id: number,
+    updateFeeCategoryDto: UpdateFeeCategoryDto,
+    schoolId?: number,
+  ): Promise<FeeCategory> {
     const category = await this.findOne(id, schoolId);
     Object.assign(category, updateFeeCategoryDto);
     return await this.feeCategoriesRepository.save(category);
@@ -60,4 +64,3 @@ export class FeeCategoriesService {
     await this.feeCategoriesRepository.remove(category);
   }
 }
-

@@ -11,7 +11,16 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiOkResponse, ApiExtraModels, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiOkResponse,
+  ApiExtraModels,
+  ApiParam,
+} from '@nestjs/swagger';
 import { CategoryHeadsService } from './category-heads.service';
 import { CreateCategoryHeadDto } from './dto/create-category-head.dto';
 import { UpdateCategoryHeadDto } from './dto/update-category-head.dto';
@@ -32,10 +41,19 @@ export class CategoryHeadsController {
   @Post()
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new category head' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'School ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'School ID (optional for super admin)',
+  })
   @ApiOkResponse({ description: 'Category head created successfully', status: 201 })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  create(@Body() createCategoryHeadDto: CreateCategoryHeadDto, @Request() req: any, @Query('schoolId') schoolId?: string) {
+  create(
+    @Body() createCategoryHeadDto: CreateCategoryHeadDto,
+    @Request() req: any,
+    @Query('schoolId') schoolId?: string,
+  ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
     const targetSchoolId = schoolId ? +schoolId : userSchoolId;
 
@@ -52,9 +70,24 @@ export class CategoryHeadsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all category heads with pagination and search' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or description' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, max: 100)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by name or description',
+  })
   @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID' })
   @ApiOkResponse({ description: 'Paginated list of category heads' })
   findAll(
@@ -65,7 +98,11 @@ export class CategoryHeadsController {
     @Query('schoolId') schoolId?: string,
   ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     return this.categoryHeadsService.findAll(
       page ? +page : 1,
@@ -78,12 +115,21 @@ export class CategoryHeadsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get category head by ID' })
   @ApiParam({ name: 'id', description: 'Category head ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ description: 'Category head found' })
   @ApiResponse({ status: 404, description: 'Category head not found' })
   findOne(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     return this.categoryHeadsService.findOne(+id, targetSchoolId);
   }
@@ -92,7 +138,12 @@ export class CategoryHeadsController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update category head' })
   @ApiParam({ name: 'id', description: 'Category head ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ description: 'Category head updated successfully' })
   @ApiResponse({ status: 404, description: 'Category head not found' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
@@ -103,7 +154,11 @@ export class CategoryHeadsController {
     @Query('schoolId') schoolId?: string,
   ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('School ID is required');
@@ -116,13 +171,22 @@ export class CategoryHeadsController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete category head' })
   @ApiParam({ name: 'id', description: 'Category head ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ description: 'Category head deleted successfully' })
   @ApiResponse({ status: 404, description: 'Category head not found' })
   @ApiResponse({ status: 400, description: 'Cannot delete - category head is in use' })
   remove(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
 
     if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('School ID is required');
@@ -131,4 +195,3 @@ export class CategoryHeadsController {
     return this.categoryHeadsService.remove(+id, targetSchoolId);
   }
 }
-

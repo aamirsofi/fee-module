@@ -66,15 +66,15 @@ export class Payment {
   @Column()
   schoolId!: number;
 
-  @ManyToOne(() => School, (school) => school.payments)
+  @ManyToOne(() => School, school => school.payments)
   @JoinColumn({ name: 'schoolId' })
   school!: School;
 
-  @ManyToOne(() => Student, (student) => student.payments)
+  @ManyToOne(() => Student, student => student.payments)
   @JoinColumn({ name: 'studentId' })
   student!: Student;
 
-  @ManyToOne(() => FeeStructure, (feeStructure) => feeStructure.payments)
+  @ManyToOne(() => FeeStructure, feeStructure => feeStructure.payments)
   @JoinColumn({ name: 'feeStructureId' })
   feeStructure!: FeeStructure;
 
@@ -84,4 +84,3 @@ export class Payment {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

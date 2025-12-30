@@ -1,4 +1,12 @@
-import { IsNumber, IsString, MinLength, IsOptional, IsEnum, IsDateString, Min } from 'class-validator';
+import {
+  IsNumber,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  Min,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { StructureStatus } from '../entities/fee-structure.entity';
 
@@ -22,7 +30,7 @@ export class CreateFeeStructureDto {
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ example: 5000.00 })
+  @ApiProperty({ example: 5000.0 })
   @IsNumber()
   @Min(0)
   amount!: number;
@@ -47,4 +55,3 @@ export class CreateFeeStructureDto {
   @IsOptional()
   status?: StructureStatus;
 }
-

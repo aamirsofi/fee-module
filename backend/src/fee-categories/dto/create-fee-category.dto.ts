@@ -1,4 +1,14 @@
-import { IsString, MinLength, IsOptional, IsEnum, IsArray, ArrayMinSize, ArrayMaxSize, IsInt, Min, Max } from 'class-validator';
+import {
+  IsString,
+  MinLength,
+  IsOptional,
+  IsEnum,
+  IsArray,
+  ArrayMaxSize,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { CategoryStatus, FeeCategoryType } from '../entities/fee-category.entity';
@@ -14,7 +24,12 @@ export class CreateFeeCategoryDto {
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ enum: FeeCategoryType, required: false, default: FeeCategoryType.SCHOOL, example: 'school' })
+  @ApiProperty({
+    enum: FeeCategoryType,
+    required: false,
+    default: FeeCategoryType.SCHOOL,
+    example: 'school',
+  })
   @IsEnum(FeeCategoryType)
   @IsOptional()
   type?: FeeCategoryType;
@@ -39,4 +54,3 @@ export class CreateFeeCategoryDto {
   @Type(() => Number)
   applicableMonths?: number[];
 }
-

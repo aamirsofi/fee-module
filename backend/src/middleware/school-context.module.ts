@@ -12,4 +12,3 @@ export class SchoolContextModule implements NestModule {
     consumer.apply(SchoolContextMiddleware).forRoutes('*');
   }
 }
-

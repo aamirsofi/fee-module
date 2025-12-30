@@ -11,4 +11,3 @@ import { FeeCategory } from './entities/fee-category.entity';
   exports: [FeeCategoriesService],
 })
 export class FeeCategoriesModule {}
-

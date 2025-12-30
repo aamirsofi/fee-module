@@ -32,23 +32,25 @@ export class StudentsController {
   @ApiResponse({ status: 201, description: 'Student created successfully' })
   create(@Body() createStudentDto: CreateStudentDto, @Request() req: any) {
     const schoolId = req.school?.id || req.user?.schoolId;
-    
+
     // Log for debugging
     console.log('Creating student with schoolId:', schoolId);
     console.log('req.school:', req.school);
     console.log('req.user:', req.user);
-    
+
     // All users including super admin need a school context to create students
     if (!schoolId) {
-      throw new BadRequestException('School context required. Please create a school first or access via school subdomain.');
+      throw new BadRequestException(
+        'School context required. Please create a school first or access via school subdomain.',
+      );
     }
-    
+
     // Ensure schoolId is a number
     const numericSchoolId = typeof schoolId === 'string' ? parseInt(schoolId, 10) : schoolId;
     if (isNaN(numericSchoolId)) {
       throw new BadRequestException(`Invalid school ID: ${schoolId}`);
     }
-    
+
     return this.studentsService.create(createStudentDto, numericSchoolId);
   }
 
@@ -95,4 +97,3 @@ export class StudentsController {
     return this.studentsService.remove(+id, schoolId);
   }
 }
-

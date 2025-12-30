@@ -18,4 +18,3 @@ export class CreateCategoryHeadDto {
   @IsOptional()
   status?: CategoryHeadStatus;
 }
-

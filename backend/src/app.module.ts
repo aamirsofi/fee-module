@@ -37,9 +37,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.THROTTLE_TTL || '60') * 1000,
-        limit: process.env.NODE_ENV === 'production' 
-          ? parseInt(process.env.THROTTLE_LIMIT || '100')
-          : 10000, // Very high limit for development
+        limit:
+          process.env.NODE_ENV === 'production'
+            ? parseInt(process.env.THROTTLE_LIMIT || '100')
+            : 10000, // Very high limit for development
       },
     ]),
 
@@ -78,8 +79,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
   ],
 })
 export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  configure(_consumer: MiddlewareConsumer) {
     // School context middleware is applied in SchoolContextModule
   }
 }
-

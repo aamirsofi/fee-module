@@ -11,4 +11,3 @@ import { CategoryHead } from './entities/category-head.entity';
   exports: [CategoryHeadsService],
 })
 export class CategoryHeadsModule {}
-

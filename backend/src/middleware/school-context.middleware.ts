@@ -18,10 +18,7 @@ export class SchoolContextMiddleware implements NestMiddleware {
 
     // For localhost/127.0.0.1, check header or query param (for testing)
     if (['localhost', '127.0.0.1'].includes(host.split(':')[0])) {
-      subdomain =
-        req.get('X-School-Subdomain') ||
-        (req.query.school as string) ||
-        subdomain;
+      subdomain = req.get('X-School-Subdomain') || (req.query.school as string) || subdomain;
     }
 
     // Allow super admin to access without school context
@@ -81,4 +78,3 @@ export class SchoolContextMiddleware implements NestMiddleware {
     return null;
   }
 }
-

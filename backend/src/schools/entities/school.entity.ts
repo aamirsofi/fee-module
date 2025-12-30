@@ -62,22 +62,22 @@ export class School {
   @JoinColumn({ name: 'createdById' })
   createdBy!: User;
 
-  @OneToMany(() => Student, (student) => student.school)
+  @OneToMany(() => Student, student => student.school)
   students!: Student[];
 
-  @OneToMany(() => FeeCategory, (category) => category.school)
+  @OneToMany(() => FeeCategory, category => category.school)
   feeCategories!: FeeCategory[];
 
-  @OneToMany(() => FeeStructure, (feeStructure) => feeStructure.school)
+  @OneToMany(() => FeeStructure, feeStructure => feeStructure.school)
   feeStructures!: FeeStructure[];
 
-  @OneToMany(() => Payment, (payment) => payment.school)
+  @OneToMany(() => Payment, payment => payment.school)
   payments!: Payment[];
 
-  @OneToMany(() => CategoryHead, (categoryHead) => categoryHead.school)
+  @OneToMany(() => CategoryHead, categoryHead => categoryHead.school)
   categoryHeads!: CategoryHead[];
 
-  @OneToMany(() => Class, (classEntity) => classEntity.school)
+  @OneToMany(() => Class, classEntity => classEntity.school)
   classes!: Class[];
 
   @CreateDateColumn()
@@ -86,4 +86,3 @@ export class School {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

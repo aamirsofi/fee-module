@@ -18,4 +18,3 @@ export class CreateClassDto {
   @IsOptional()
   status?: ClassStatus;
 }
-

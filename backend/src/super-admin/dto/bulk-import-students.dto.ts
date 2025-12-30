@@ -27,4 +27,3 @@ export class BulkImportStudentsDto {
   @Type(() => CreateStudentDto)
   students!: CreateStudentDto[];
 }
-

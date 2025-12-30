@@ -11,7 +11,7 @@ export class CreatePaymentDto {
   @IsNumber()
   feeStructureId!: number;
 
-  @ApiProperty({ example: 5000.00 })
+  @ApiProperty({ example: 5000.0 })
   @IsNumber()
   @Min(0)
   amount!: number;
@@ -40,4 +40,3 @@ export class CreatePaymentDto {
   @IsOptional()
   notes?: string;
 }
-

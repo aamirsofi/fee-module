@@ -35,7 +35,7 @@ export class Class {
   })
   status!: ClassStatus;
 
-  @ManyToOne(() => School, (school) => school.classes)
+  @ManyToOne(() => School, school => school.classes)
   @JoinColumn({ name: 'schoolId' })
   school!: School;
 
@@ -45,4 +45,3 @@ export class Class {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

@@ -38,13 +38,26 @@ export class FeeCategoriesController {
   @Post()
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new fee category' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'School ID (optional for super admin)' })
-  @ApiOkResponse({ type: FeeCategory, description: 'Fee category created successfully', status: 201 })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'School ID (optional for super admin)',
+  })
+  @ApiOkResponse({
+    type: FeeCategory,
+    description: 'Fee category created successfully',
+    status: 201,
+  })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  create(@Body() createFeeCategoryDto: CreateFeeCategoryDto, @Request() req: any, @Query('schoolId') schoolId?: string) {
+  create(
+    @Body() createFeeCategoryDto: CreateFeeCategoryDto,
+    @Request() req: any,
+    @Query('schoolId') schoolId?: string,
+  ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
     const targetSchoolId = schoolId ? +schoolId : userSchoolId;
-    
+
     if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new Error('School context required');
     }
@@ -53,23 +66,41 @@ export class FeeCategoriesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all fee categories' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: [FeeCategory], description: 'List of fee categories' })
   findAll(@Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeCategoriesService.findAll(targetSchoolId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get fee category by ID' })
   @ApiParam({ name: 'id', description: 'Fee category ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: FeeCategory, description: 'Fee category found' })
   @ApiResponse({ status: 404, description: 'Fee category not found' })
   findOne(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeCategoriesService.findOne(+id, targetSchoolId);
   }
 
@@ -77,13 +108,27 @@ export class FeeCategoriesController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update fee category' })
   @ApiParam({ name: 'id', description: 'Fee category ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: FeeCategory, description: 'Fee category updated successfully' })
   @ApiResponse({ status: 404, description: 'Fee category not found' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  update(@Param('id') id: string, @Body() updateFeeCategoryDto: UpdateFeeCategoryDto, @Request() req: any, @Query('schoolId') schoolId?: string) {
+  update(
+    @Param('id') id: string,
+    @Body() updateFeeCategoryDto: UpdateFeeCategoryDto,
+    @Request() req: any,
+    @Query('schoolId') schoolId?: string,
+  ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeCategoriesService.update(+id, updateFeeCategoryDto, targetSchoolId);
   }
 
@@ -91,13 +136,21 @@ export class FeeCategoriesController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete fee category' })
   @ApiParam({ name: 'id', description: 'Fee category ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ description: 'Fee category deleted successfully' })
   @ApiResponse({ status: 404, description: 'Fee category not found' })
   remove(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeCategoriesService.remove(+id, targetSchoolId);
   }
 }
-

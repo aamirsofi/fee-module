@@ -62,7 +62,11 @@ export class PaymentsService {
     });
   }
 
-  async update(id: number, updatePaymentDto: UpdatePaymentDto, schoolId?: number): Promise<Payment> {
+  async update(
+    id: number,
+    updatePaymentDto: UpdatePaymentDto,
+    schoolId?: number,
+  ): Promise<Payment> {
     const payment = await this.findOne(id, schoolId);
     const updateData: any = { ...updatePaymentDto };
     if (updatePaymentDto.paymentDate) {
@@ -77,4 +81,3 @@ export class PaymentsService {
     await this.paymentsRepository.remove(payment);
   }
 }
-

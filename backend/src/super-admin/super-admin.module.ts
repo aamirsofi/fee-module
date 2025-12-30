@@ -15,7 +15,15 @@ import { CategoryHeadsModule } from '../category-heads/category-heads.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([School, User, Student, Payment, FeeStructure, FeeCategory, CategoryHead]),
+    TypeOrmModule.forFeature([
+      School,
+      User,
+      Student,
+      Payment,
+      FeeStructure,
+      FeeCategory,
+      CategoryHead,
+    ]),
     SchoolsModule,
     UsersModule,
     CategoryHeadsModule,
@@ -25,4 +33,3 @@ import { CategoryHeadsModule } from '../category-heads/category-heads.module';
   exports: [SuperAdminService],
 })
 export class SuperAdminModule {}
-

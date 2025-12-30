@@ -37,11 +37,11 @@ export class CategoryHead {
   @Column()
   schoolId!: number;
 
-  @ManyToOne(() => School, (school) => school.categoryHeads)
+  @ManyToOne(() => School, school => school.categoryHeads)
   @JoinColumn({ name: 'schoolId' })
   school!: School;
 
-  @OneToMany(() => FeeStructure, (feeStructure) => feeStructure.categoryHead)
+  @OneToMany(() => FeeStructure, feeStructure => feeStructure.categoryHead)
   feeStructures!: FeeStructure[];
 
   @CreateDateColumn()
@@ -50,4 +50,3 @@ export class CategoryHead {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

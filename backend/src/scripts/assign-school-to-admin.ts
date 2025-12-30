@@ -24,7 +24,7 @@ async function assignSchoolToAdmin() {
     order: { id: 'ASC' },
     take: 1,
   });
-  
+
   const school = schools[0];
 
   if (!school) {
@@ -45,8 +45,7 @@ async function assignSchoolToAdmin() {
   process.exit(0);
 }
 
-assignSchoolToAdmin().catch((error) => {
+assignSchoolToAdmin().catch(error => {
   console.error('Error assigning school:', error);
   process.exit(1);
 });
-

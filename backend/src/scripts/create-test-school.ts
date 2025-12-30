@@ -56,8 +56,7 @@ async function createTestSchool() {
   process.exit(0);
 }
 
-createTestSchool().catch((error) => {
+createTestSchool().catch(error => {
   console.error('Error creating test school:', error);
   process.exit(1);
 });
-

@@ -37,8 +37,7 @@ async function createAdmin() {
   process.exit(0);
 }
 
-createAdmin().catch((error) => {
+createAdmin().catch(error => {
   console.error('Error creating admin:', error);
   process.exit(1);
 });
-

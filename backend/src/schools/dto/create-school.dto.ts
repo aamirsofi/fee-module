@@ -42,4 +42,3 @@ export class CreateSchoolDto {
   @IsOptional()
   status?: SchoolStatus;
 }
-

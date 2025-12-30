@@ -1,10 +1,6 @@
 import { PaginationMeta, PaginatedResponse } from '../dto/pagination.dto';
 
-export function createPaginationMeta(
-  total: number,
-  page: number,
-  limit: number,
-): PaginationMeta {
+export function createPaginationMeta(total: number, page: number, limit: number): PaginationMeta {
   const totalPages = Math.ceil(total / limit);
   return {
     total,
@@ -39,4 +35,3 @@ export function getPaginationParams(page?: number, limit?: number) {
     skip,
   };
 }
-

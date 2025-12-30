@@ -4,7 +4,7 @@ async function fixOrphanedSchoolIds() {
   await dataSource.initialize();
 
   const queryRunner = dataSource.createQueryRunner();
-  
+
   try {
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -53,8 +53,7 @@ async function fixOrphanedSchoolIds() {
   process.exit(0);
 }
 
-fixOrphanedSchoolIds().catch((error) => {
+fixOrphanedSchoolIds().catch(error => {
   console.error('Error:', error);
   process.exit(1);
 });
-

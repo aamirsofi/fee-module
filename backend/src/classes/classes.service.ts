@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Class } from './entities/class.entity';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
@@ -45,27 +45,22 @@ export class ClassesService {
   ) {
     const { skip, limit: take } = getPaginationParams(page, limit);
 
-    const queryBuilder = this.classesRepository
-      .createQueryBuilder('class');
-    
+    const queryBuilder = this.classesRepository.createQueryBuilder('class');
+
     if (schoolId) {
       queryBuilder.where('class.schoolId = :schoolId', { schoolId });
     }
 
     // Search by name or description
     if (search && search.trim()) {
-      queryBuilder.andWhere(
-        '(class.name ILike :search OR class.description ILike :search)',
-        { search: `%${search.trim()}%` },
-      );
+      queryBuilder.andWhere('(class.name ILike :search OR class.description ILike :search)', {
+        search: `%${search.trim()}%`,
+      });
     }
 
     queryBuilder.orderBy('class.name', 'ASC');
 
-    const [classes, total] = await queryBuilder
-      .skip(skip)
-      .take(take)
-      .getManyAndCount();
+    const [classes, total] = await queryBuilder.skip(skip).take(take).getManyAndCount();
 
     return createPaginatedResponse(classes, total, page, limit);
   }
@@ -132,4 +127,3 @@ export class ClassesService {
     return { message: 'Class deleted successfully' };
   }
 }
-

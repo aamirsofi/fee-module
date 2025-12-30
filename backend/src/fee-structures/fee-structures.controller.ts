@@ -38,13 +38,26 @@ export class FeeStructuresController {
   @Post()
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new fee structure' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'School ID (optional for super admin)' })
-  @ApiOkResponse({ type: FeeStructure, description: 'Fee structure created successfully', status: 201 })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'School ID (optional for super admin)',
+  })
+  @ApiOkResponse({
+    type: FeeStructure,
+    description: 'Fee structure created successfully',
+    status: 201,
+  })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  create(@Body() createFeeStructureDto: CreateFeeStructureDto, @Request() req: any, @Query('schoolId') schoolId?: string) {
+  create(
+    @Body() createFeeStructureDto: CreateFeeStructureDto,
+    @Request() req: any,
+    @Query('schoolId') schoolId?: string,
+  ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
     const targetSchoolId = schoolId ? +schoolId : userSchoolId;
-    
+
     if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new Error('School context required');
     }
@@ -53,7 +66,12 @@ export class FeeStructuresController {
 
   @Get()
   @ApiOperation({ summary: 'Get all fee structures' })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({
     type: [FeeStructure],
     description: 'List of fee structures',
@@ -82,19 +100,32 @@ export class FeeStructuresController {
   })
   findAll(@Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeStructuresService.findAll(targetSchoolId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get fee structure by ID' })
   @ApiParam({ name: 'id', description: 'Fee structure ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: FeeStructure, description: 'Fee structure found' })
   @ApiResponse({ status: 404, description: 'Fee structure not found' })
   findOne(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeStructuresService.findOne(+id, targetSchoolId);
   }
 
@@ -102,13 +133,27 @@ export class FeeStructuresController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update fee structure' })
   @ApiParam({ name: 'id', description: 'Fee structure ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ type: FeeStructure, description: 'Fee structure updated successfully' })
   @ApiResponse({ status: 404, description: 'Fee structure not found' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  update(@Param('id') id: string, @Body() updateFeeStructureDto: UpdateFeeStructureDto, @Request() req: any, @Query('schoolId') schoolId?: string) {
+  update(
+    @Param('id') id: string,
+    @Body() updateFeeStructureDto: UpdateFeeStructureDto,
+    @Request() req: any,
+    @Query('schoolId') schoolId?: string,
+  ) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeStructuresService.update(+id, updateFeeStructureDto, targetSchoolId);
   }
 
@@ -116,14 +161,22 @@ export class FeeStructuresController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete fee structure' })
   @ApiParam({ name: 'id', description: 'Fee structure ID', type: Number })
-  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID (optional for super admin)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiOkResponse({ description: 'Fee structure deleted successfully' })
   @ApiResponse({ status: 404, description: 'Fee structure not found' })
   @ApiResponse({ status: 400, description: 'Bad request - fee structure is in use' })
   remove(@Param('id') id: string, @Request() req: any, @Query('schoolId') schoolId?: string) {
     const userSchoolId = req.school?.id || req.user.schoolId;
-    const targetSchoolId = schoolId ? +schoolId : (req.user.role === UserRole.SUPER_ADMIN ? undefined : userSchoolId);
+    const targetSchoolId = schoolId
+      ? +schoolId
+      : req.user.role === UserRole.SUPER_ADMIN
+        ? undefined
+        : userSchoolId;
     return this.feeStructuresService.remove(+id, targetSchoolId);
   }
 }
-

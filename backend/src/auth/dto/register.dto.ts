@@ -20,4 +20,3 @@ export class RegisterDto {
   @IsOptional()
   schoolId?: number;
 }
-

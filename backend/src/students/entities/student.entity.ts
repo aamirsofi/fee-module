@@ -7,8 +7,6 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
-  ManyToMany,
-  JoinTable,
 } from 'typeorm';
 import { School } from '../../schools/entities/school.entity';
 import { User } from '../../users/entities/user.entity';
@@ -63,7 +61,7 @@ export class Student {
   @Column()
   schoolId!: number;
 
-  @ManyToOne(() => School, (school) => school.students)
+  @ManyToOne(() => School, school => school.students)
   @JoinColumn({ name: 'schoolId' })
   school!: School;
 
@@ -71,10 +69,10 @@ export class Student {
   @JoinColumn({ name: 'userId' })
   user?: User;
 
-  @OneToMany(() => Payment, (payment) => payment.student)
+  @OneToMany(() => Payment, payment => payment.student)
   payments!: Payment[];
 
-  @OneToMany(() => StudentFeeStructure, (sf) => sf.student)
+  @OneToMany(() => StudentFeeStructure, sf => sf.student)
   feeStructures!: StudentFeeStructure[];
 
   @CreateDateColumn()
@@ -83,4 +81,3 @@ export class Student {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

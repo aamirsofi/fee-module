@@ -7,4 +7,3 @@ import { StudentFeeStructure } from './entities/student-fee-structure.entity';
   exports: [TypeOrmModule],
 })
 export class StudentFeeStructuresModule {}
-
