@@ -18,6 +18,9 @@ import { BulkImportStudentsDto } from './dto/bulk-import-students.dto';
 import { CreateStudentDto } from '../students/dto/create-student.dto';
 import { CreateFeeCategoryDto } from '../fee-categories/dto/create-fee-category.dto';
 import { UpdateFeeCategoryDto } from '../fee-categories/dto/update-fee-category.dto';
+import { CreateFeeStructureDto } from '../fee-structures/dto/create-fee-structure.dto';
+import { UpdateFeeStructureDto } from '../fee-structures/dto/update-fee-structure.dto';
+import { CategoryHead } from '../category-heads/entities/category-head.entity';
 
 @Injectable()
 export class SuperAdminService {
@@ -34,6 +37,8 @@ export class SuperAdminService {
     private feeStructuresRepository: Repository<FeeStructure>,
     @InjectRepository(FeeCategory)
     private feeCategoriesRepository: Repository<FeeCategory>,
+    @InjectRepository(CategoryHead)
+    private categoryHeadsRepository: Repository<CategoryHead>,
     private schoolsService: SchoolsService,
     private usersService: UsersService,
   ) {}
@@ -698,6 +703,257 @@ export class SuperAdminService {
 
     await this.feeCategoriesRepository.remove(feeCategory);
     return { message: 'Fee category deleted successfully' };
+  }
+
+  // ========== FEE STRUCTURES (FEE PLANS) MANAGEMENT ==========
+  async getAllFeeStructures(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    schoolId?: number,
+    feeCategoryId?: number,
+    categoryHeadId?: number,
+    academicYear?: string,
+  ) {
+    const { skip, limit: take } = getPaginationParams(page, limit);
+
+    const queryBuilder = this.feeStructuresRepository
+      .createQueryBuilder('fs')
+      .leftJoinAndSelect('fs.school', 'school')
+      .leftJoinAndSelect('fs.category', 'category')
+      .leftJoinAndSelect('fs.categoryHead', 'categoryHead');
+
+    // Apply filters
+    if (schoolId) {
+      queryBuilder.andWhere('fs.schoolId = :schoolId', { schoolId });
+    }
+
+    if (feeCategoryId) {
+      queryBuilder.andWhere('fs.feeCategoryId = :feeCategoryId', { feeCategoryId });
+    }
+
+    if (categoryHeadId !== undefined) {
+      if (categoryHeadId === null) {
+        queryBuilder.andWhere('fs.categoryHeadId IS NULL');
+      } else {
+        queryBuilder.andWhere('fs.categoryHeadId = :categoryHeadId', { categoryHeadId });
+      }
+    }
+
+    if (academicYear) {
+      queryBuilder.andWhere('fs.academicYear = :academicYear', { academicYear });
+    }
+
+    // Search by name or description
+    if (search && search.trim()) {
+      queryBuilder.andWhere(
+        '(fs.name ILike :search OR fs.description ILike :search)',
+        { search: `%${search.trim()}%` },
+      );
+    }
+
+    queryBuilder.orderBy('fs.createdAt', 'DESC');
+
+    const [feeStructures, total] = await queryBuilder
+      .skip(skip)
+      .take(take)
+      .getManyAndCount();
+
+    return createPaginatedResponse(feeStructures, total, page, limit);
+  }
+
+  async getFeeStructureById(id: number) {
+    const feeStructure = await this.feeStructuresRepository.findOne({
+      where: { id },
+      relations: ['school', 'category', 'categoryHead'],
+    });
+
+    if (!feeStructure) {
+      throw new NotFoundException(`Fee structure with ID ${id} not found`);
+    }
+
+    return feeStructure;
+  }
+
+  async createFeeStructure(createFeeStructureDto: CreateFeeStructureDto, schoolId: number) {
+    // Verify school exists
+    const school = await this.schoolsRepository.findOne({ where: { id: schoolId } });
+    if (!school) {
+      throw new NotFoundException(`School with ID ${schoolId} not found`);
+    }
+
+    // Verify fee category exists and belongs to school
+    const feeCategory = await this.feeCategoriesRepository.findOne({
+      where: { id: createFeeStructureDto.feeCategoryId },
+    });
+    if (!feeCategory) {
+      throw new NotFoundException(
+        `Fee category with ID ${createFeeStructureDto.feeCategoryId} not found`,
+      );
+    }
+    if (feeCategory.schoolId !== schoolId) {
+      throw new BadRequestException(
+        `Fee category does not belong to school with ID ${schoolId}`,
+      );
+    }
+
+    // Verify category head if provided
+    if (createFeeStructureDto.categoryHeadId) {
+      const categoryHead = await this.categoryHeadsRepository.findOne({
+        where: { id: createFeeStructureDto.categoryHeadId },
+      });
+      if (!categoryHead) {
+        throw new NotFoundException(
+          `Category head with ID ${createFeeStructureDto.categoryHeadId} not found`,
+        );
+      }
+      if (categoryHead.schoolId !== schoolId) {
+        throw new BadRequestException(
+          `Category head does not belong to school with ID ${schoolId}`,
+        );
+      }
+    }
+
+    // Check for duplicate name within school
+    const existing = await this.feeStructuresRepository.findOne({
+      where: {
+        name: createFeeStructureDto.name,
+        schoolId,
+        academicYear: createFeeStructureDto.academicYear,
+      },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        `Fee structure with name "${createFeeStructureDto.name}" already exists for this school and academic year`,
+      );
+    }
+
+    const feeStructure = this.feeStructuresRepository.create({
+      ...createFeeStructureDto,
+      schoolId,
+      dueDate: createFeeStructureDto.dueDate
+        ? new Date(createFeeStructureDto.dueDate)
+        : undefined,
+    });
+
+    return await this.feeStructuresRepository.save(feeStructure);
+  }
+
+  async updateFeeStructure(
+    id: number,
+    updateFeeStructureDto: UpdateFeeStructureDto,
+    schoolId: number,
+  ) {
+    const feeStructure = await this.feeStructuresRepository.findOne({
+      where: { id },
+      relations: ['school', 'category', 'categoryHead'],
+    });
+
+    if (!feeStructure) {
+      throw new NotFoundException(`Fee structure with ID ${id} not found`);
+    }
+
+    // Verify school matches
+    if (feeStructure.schoolId !== schoolId) {
+      throw new BadRequestException(
+        `Fee structure does not belong to school with ID ${schoolId}`,
+      );
+    }
+
+    // Verify fee category if being updated
+    if (updateFeeStructureDto.feeCategoryId) {
+      const feeCategory = await this.feeCategoriesRepository.findOne({
+        where: { id: updateFeeStructureDto.feeCategoryId },
+      });
+      if (!feeCategory) {
+        throw new NotFoundException(
+          `Fee category with ID ${updateFeeStructureDto.feeCategoryId} not found`,
+        );
+      }
+      if (feeCategory.schoolId !== schoolId) {
+        throw new BadRequestException(
+          `Fee category does not belong to school with ID ${schoolId}`,
+        );
+      }
+    }
+
+    // Verify category head if being updated
+    if (updateFeeStructureDto.categoryHeadId !== undefined) {
+      if (updateFeeStructureDto.categoryHeadId) {
+        const categoryHead = await this.categoryHeadsRepository.findOne({
+          where: { id: updateFeeStructureDto.categoryHeadId },
+        });
+        if (!categoryHead) {
+          throw new NotFoundException(
+            `Category head with ID ${updateFeeStructureDto.categoryHeadId} not found`,
+          );
+        }
+        if (categoryHead.schoolId !== schoolId) {
+          throw new BadRequestException(
+            `Category head does not belong to school with ID ${schoolId}`,
+          );
+        }
+      }
+    }
+
+    // Check for duplicate name if name is being updated
+    if (updateFeeStructureDto.name) {
+      const existing = await this.feeStructuresRepository.findOne({
+        where: {
+          name: updateFeeStructureDto.name,
+          schoolId,
+          academicYear: updateFeeStructureDto.academicYear || feeStructure.academicYear,
+        },
+      });
+      if (existing && existing.id !== id) {
+        throw new BadRequestException(
+          `Fee structure with name "${updateFeeStructureDto.name}" already exists for this school and academic year`,
+        );
+      }
+    }
+
+    // Update fields
+    Object.assign(feeStructure, {
+      ...updateFeeStructureDto,
+      dueDate: updateFeeStructureDto.dueDate
+        ? new Date(updateFeeStructureDto.dueDate)
+        : feeStructure.dueDate,
+    });
+
+    return await this.feeStructuresRepository.save(feeStructure);
+  }
+
+  async removeFeeStructure(id: number, schoolId: number) {
+    const feeStructure = await this.feeStructuresRepository.findOne({
+      where: { id },
+      relations: ['studentStructures', 'payments'],
+    });
+
+    if (!feeStructure) {
+      throw new NotFoundException(`Fee structure with ID ${id} not found`);
+    }
+
+    // Verify school matches
+    if (feeStructure.schoolId !== schoolId) {
+      throw new BadRequestException(
+        `Fee structure does not belong to school with ID ${schoolId}`,
+      );
+    }
+
+    // Check if fee structure has associated student structures or payments
+    if (
+      (feeStructure.studentStructures && feeStructure.studentStructures.length > 0) ||
+      (feeStructure.payments && feeStructure.payments.length > 0)
+    ) {
+      const studentCount = feeStructure.studentStructures?.length || 0;
+      const paymentCount = feeStructure.payments?.length || 0;
+      throw new BadRequestException(
+        `Cannot delete fee structure. It has ${studentCount} student assignment(s) and ${paymentCount} payment(s). Please remove or reassign them first.`,
+      );
+    }
+
+    await this.feeStructuresRepository.remove(feeStructure);
+    return { message: 'Fee structure deleted successfully' };
   }
 }
 

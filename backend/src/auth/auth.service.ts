@@ -13,36 +13,62 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
-    if (user && (await bcrypt.compare(password, user.password))) {
-      const { password: _, ...result } = user;
-      return result;
+    try {
+      const user = await this.usersService.findByEmail(email);
+      if (!user) {
+        return null;
+      }
+      
+      if (!user.password) {
+        console.error('User found but password field is missing:', user);
+        return null;
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (isPasswordValid) {
+        const { password: _, ...result } = user;
+        return result;
+      }
+      return null;
+    } catch (error) {
+      console.error('validateUser error:', error);
+      throw error;
     }
-    return null;
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    try {
+      const user = await this.validateUser(loginDto.email, loginDto.password);
+      if (!user) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
 
-    const payload = { 
-      email: user.email, 
-      sub: user.id, 
-      role: user.role,
-      schoolId: user.schoolId,
-    };
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
+      const payload = { 
+        email: user.email, 
+        sub: user.id, 
         role: user.role,
         schoolId: user.schoolId,
-      },
-    };
+      };
+      return {
+        access_token: this.jwtService.sign(payload),
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          schoolId: user.schoolId,
+        },
+      };
+    } catch (error: any) {
+      // Log the error for debugging
+      console.error('Login error:', error);
+      // Re-throw UnauthorizedException as-is
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      // Wrap other errors
+      throw new UnauthorizedException('Login failed: ' + (error?.message || 'Unknown error'));
+    }
   }
 
   async register(registerDto: RegisterDto) {

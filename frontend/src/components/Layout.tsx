@@ -155,12 +155,12 @@ export default function Layout({ children }: LayoutProps) {
             },
             {
               name: "Fee Heading",
-              path: "/super-admin/settings/fee-settings/fee-heads/fee-heading",
+              path: "/super-admin/settings/fee-settings/fee-heading",
               icon: FiDollarSign,
             },
             {
               name: "Fee Plan",
-              path: "/super-admin/settings/fee-settings/fee-heads/fee-plan",
+              path: "/super-admin/settings/fee-settings/fee-plan",
               icon: FiCreditCard,
             },
             {

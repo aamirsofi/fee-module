@@ -73,15 +73,29 @@ export interface FeeCategory {
 
 export interface FeeStructure {
   id: number;
+  schoolId: number;
+  feeCategoryId: number;
+  categoryHeadId?: number;
   name: string;
   description?: string;
   amount: number;
-  categoryId: number;
+  class?: string;
   academicYear: string;
   dueDate?: string;
-  applicableClasses?: string[];
   status: 'active' | 'inactive';
+  category?: FeeCategory;
+  categoryHead?: CategoryHead;
+  school?: School;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryHead {
+  id: number;
   schoolId: number;
+  name: string;
+  description?: string;
+  status: 'active' | 'inactive';
   createdAt: string;
   updatedAt: string;
 }

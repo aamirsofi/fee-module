@@ -7,6 +7,11 @@ export class CreateFeeStructureDto {
   @IsNumber()
   feeCategoryId!: number;
 
+  @ApiProperty({ required: false, example: 1 })
+  @IsNumber()
+  @IsOptional()
+  categoryHeadId?: number;
+
   @ApiProperty({ example: 'Annual Tuition Fee 2024' })
   @IsString()
   @MinLength(2)

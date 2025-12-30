@@ -31,10 +31,12 @@ import { CreateCategoryHeadDto } from '../category-heads/dto/create-category-hea
 import { UpdateCategoryHeadDto } from '../category-heads/dto/update-category-head.dto';
 import { CategoryHeadsService } from '../category-heads/category-heads.service';
 import { FeeCategoryType } from '../fee-categories/entities/fee-category.entity';
+import { CreateFeeStructureDto } from '../fee-structures/dto/create-fee-structure.dto';
+import { UpdateFeeStructureDto } from '../fee-structures/dto/update-fee-structure.dto';
 
 @ApiTags('Super Admin')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(PaginationDto)
+@ApiExtraModels(PaginationDto, BulkImportStudentsDto, CreateFeeCategoryDto, UpdateFeeCategoryDto, CreateCategoryHeadDto, UpdateCategoryHeadDto, CreateFeeStructureDto, UpdateFeeStructureDto)
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN)
@@ -550,6 +552,95 @@ export class SuperAdminController {
       throw new BadRequestException('schoolId query parameter is required');
     }
     return this.categoryHeadsService.remove(+id, +schoolId);
+  }
+
+  // ========== FEE STRUCTURES (FEE PLANS) MANAGEMENT ==========
+  @Get('fee-structures')
+  @ApiOperation({ summary: 'Get all fee structures/plans (Super Admin only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or description' })
+  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID' })
+  @ApiQuery({ name: 'feeCategoryId', required: false, type: Number, description: 'Filter by fee category ID' })
+  @ApiQuery({ name: 'categoryHeadId', required: false, type: Number, description: 'Filter by category head ID' })
+  @ApiQuery({ name: 'academicYear', required: false, type: String, description: 'Filter by academic year' })
+  @ApiResponse({ status: 200, description: 'List of fee structures' })
+  getAllFeeStructures(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('feeCategoryId') feeCategoryId?: string,
+    @Query('categoryHeadId') categoryHeadId?: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.superAdminService.getAllFeeStructures(
+      page ? +page : 1,
+      limit ? +limit : 10,
+      search,
+      schoolId ? +schoolId : undefined,
+      feeCategoryId ? +feeCategoryId : undefined,
+      categoryHeadId ? +categoryHeadId : undefined,
+      academicYear,
+    );
+  }
+
+  @Get('fee-structures/:id')
+  @ApiOperation({ summary: 'Get fee structure by ID (Super Admin only)' })
+  @ApiParam({ name: 'id', description: 'Fee structure ID' })
+  @ApiResponse({ status: 200, description: 'Fee structure found' })
+  @ApiResponse({ status: 404, description: 'Fee structure not found' })
+  getFeeStructureById(@Param('id') id: string) {
+    return this.superAdminService.getFeeStructureById(+id);
+  }
+
+  @Post('fee-structures')
+  @ApiOperation({ summary: 'Create a new fee structure/plan (Super Admin only)' })
+  @ApiBody({ type: CreateFeeStructureDto })
+  @ApiQuery({ name: 'schoolId', required: true, type: Number, description: 'School ID' })
+  @ApiResponse({ status: 201, description: 'Fee structure created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 404, description: 'School or fee category not found' })
+  createFeeStructure(
+    @Body() createFeeStructureDto: CreateFeeStructureDto,
+    @Query('schoolId') schoolId: string,
+  ) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId query parameter is required');
+    }
+    return this.superAdminService.createFeeStructure(createFeeStructureDto, +schoolId);
+  }
+
+  @Patch('fee-structures/:id')
+  @ApiOperation({ summary: 'Update fee structure/plan (Super Admin only)' })
+  @ApiParam({ name: 'id', description: 'Fee structure ID' })
+  @ApiBody({ type: UpdateFeeStructureDto })
+  @ApiQuery({ name: 'schoolId', required: true, type: Number, description: 'School ID' })
+  @ApiResponse({ status: 200, description: 'Fee structure updated successfully' })
+  @ApiResponse({ status: 404, description: 'Fee structure not found' })
+  updateFeeStructure(
+    @Param('id') id: string,
+    @Body() updateFeeStructureDto: UpdateFeeStructureDto,
+    @Query('schoolId') schoolId: string,
+  ) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId query parameter is required');
+    }
+    return this.superAdminService.updateFeeStructure(+id, updateFeeStructureDto, +schoolId);
+  }
+
+  @Delete('fee-structures/:id')
+  @ApiOperation({ summary: 'Delete fee structure/plan (Super Admin only)' })
+  @ApiParam({ name: 'id', description: 'Fee structure ID' })
+  @ApiQuery({ name: 'schoolId', required: true, type: Number, description: 'School ID' })
+  @ApiResponse({ status: 200, description: 'Fee structure deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Fee structure not found' })
+  @ApiResponse({ status: 400, description: 'Cannot delete - fee structure is in use' })
+  removeFeeStructure(@Param('id') id: string, @Query('schoolId') schoolId: string) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId query parameter is required');
+    }
+    return this.superAdminService.removeFeeStructure(+id, +schoolId);
   }
 }
 
