@@ -58,6 +58,13 @@ export class SuperAdminController {
     description: 'Items per page (default: 10, minimum: 1, maximum: 100)', 
     example: 10 
   })
+  @ApiQuery({ 
+    name: 'status', 
+    required: false, 
+    type: String, 
+    description: 'Filter by status (active, inactive, suspended)', 
+    example: 'active' 
+  })
   @ApiOkResponse({ 
     type: PaginatedSchoolResponseDto,
     description: 'Paginated list of schools',
@@ -90,8 +97,9 @@ export class SuperAdminController {
   getAllSchools(@Query() paginationDto: PaginationDto) {
     const page = paginationDto.page || 1;
     const limit = paginationDto.limit || 10;
+    const status = paginationDto.status;
     
-    return this.superAdminService.getAllSchools(page, limit);
+    return this.superAdminService.getAllSchools(page, limit, status);
   }
 
   @Get('schools/:id')

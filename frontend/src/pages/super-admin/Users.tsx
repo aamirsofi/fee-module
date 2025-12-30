@@ -10,6 +10,7 @@ import {
   FiSearch,
 } from "react-icons/fi";
 import api from "../../services/api";
+import CustomDropdown from "../../components/ui/CustomDropdown";
 
 interface User {
   id: number;
@@ -18,6 +19,14 @@ interface User {
   role: string;
   schoolId?: number;
   createdAt: string;
+}
+
+interface School {
+  id: number;
+  name: string;
+  subdomain: string;
+  email?: string;
+  status: string;
 }
 
 interface PaginationMeta {
@@ -31,7 +40,9 @@ interface PaginationMeta {
 
 export default function SuperAdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingSchools, setLoadingSchools] = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -54,6 +65,66 @@ export default function SuperAdminUsers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
 
+  useEffect(() => {
+    loadSchools();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadSchools = async () => {
+    try {
+      setLoadingSchools(true);
+      setError(""); // Clear any previous errors
+
+      // Fetch all schools - backend max limit is 100, so we'll fetch all pages if needed
+      let allSchools: School[] = [];
+      let currentPage = 1;
+      let hasMorePages = true;
+      const pageLimit = 100; // Maximum allowed by backend
+
+      while (hasMorePages) {
+        const response = await api.instance.get("/super-admin/schools", {
+          params: { page: currentPage, limit: pageLimit, status: "active" },
+        });
+
+        if (
+          response.data &&
+          response.data.data &&
+          Array.isArray(response.data.data)
+        ) {
+          allSchools = [...allSchools, ...response.data.data];
+
+          // Check if there are more pages
+          const meta = response.data.meta;
+          if (meta && meta.hasNextPage) {
+            currentPage++;
+          } else {
+            hasMorePages = false;
+          }
+        } else if (Array.isArray(response.data)) {
+          // Fallback: direct array response
+          allSchools = [...allSchools, ...response.data];
+          hasMorePages = false;
+        } else {
+          hasMorePages = false;
+        }
+      }
+
+      console.log("Loaded", allSchools.length, "schools total");
+      setSchools(allSchools);
+    } catch (err: any) {
+      console.error("Error loading schools:", err);
+      console.error("Error response:", err.response);
+      console.error("Error details:", err.response?.data);
+      const errorMessage =
+        err.response?.data?.message || err.message || "Failed to load schools";
+      console.error("Error message:", errorMessage);
+      // Don't set error state here as it might interfere with user form errors
+      setSchools([]);
+    } finally {
+      setLoadingSchools(false);
+    }
+  };
+
   const loadUsers = async () => {
     try {
       setLoading(true);
@@ -63,7 +134,7 @@ export default function SuperAdminUsers() {
       if (search.trim()) {
         params.search = search.trim();
       }
-      
+
       const response = await api.instance.get("/super-admin/users", {
         params,
       });
@@ -268,33 +339,61 @@ export default function SuperAdminUsers() {
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Role *
                 </label>
-                <select
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
+                <CustomDropdown
+                  options={[
+                    { value: "administrator", label: "Administrator" },
+                    { value: "accountant", label: "Accountant" },
+                    { value: "student", label: "Student" },
+                    { value: "parent", label: "Parent" },
+                  ]}
                   value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
+                  onChange={(value) =>
+                    setFormData({ ...formData, role: value as string })
                   }
-                >
-                  <option value="super_admin">Super Admin</option>
-                  <option value="administrator">Administrator</option>
-                  <option value="accountant">Accountant</option>
-                  <option value="student">Student</option>
-                  <option value="parent">Parent</option>
-                </select>
+                  placeholder="Select a role..."
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  School ID (optional)
+                  School (optional)
+                  {import.meta.env.DEV && (
+                    <span className="ml-2 text-xs text-gray-400">
+                      ({schools.length} loaded)
+                    </span>
+                  )}
                 </label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
-                  value={formData.schoolId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, schoolId: e.target.value })
-                  }
-                />
+                {loadingSchools ? (
+                  <div className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 flex items-center gap-2">
+                    <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                    <span className="text-gray-500">Loading schools...</span>
+                  </div>
+                ) : schools.length === 0 ? (
+                  <div className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                    No schools available. Please create a school first.
+                  </div>
+                ) : (
+                  <CustomDropdown
+                    options={[
+                      { value: "", label: "Select a school..." },
+                      ...schools.map((school) => ({
+                        value: school.id,
+                        label: `${school.name}${
+                          school.subdomain ? ` (${school.subdomain})` : ""
+                        }`,
+                      })),
+                    ]}
+                    value={formData.schoolId || ""}
+                    onChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        schoolId: value === "" ? "" : Number(value),
+                      })
+                    }
+                    placeholder="Select a school..."
+                    className="w-full"
+                  />
+                )}
               </div>
               <div className="flex gap-2 pt-1">
                 <button

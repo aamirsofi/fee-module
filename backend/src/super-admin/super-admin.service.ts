@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not, ILike } from 'typeorm';
-import { School } from '../schools/entities/school.entity';
+import { School, SchoolStatus } from '../schools/entities/school.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 import { CreateSchoolDto } from '../schools/dto/create-school.dto';
 import { UpdateSchoolDto } from '../schools/dto/update-school.dto';
@@ -36,14 +36,21 @@ export class SuperAdminService {
     return await this.schoolsService.create(createSchoolDto, createdById);
   }
 
-  async getAllSchools(page: number = 1, limit: number = 10) {
+  async getAllSchools(page: number = 1, limit: number = 10, status?: string) {
     try {
       const { skip, limit: take } = getPaginationParams(page, limit);
       
+      // Build where clause
+      const whereConditions: any = {};
+      if (status) {
+        whereConditions.status = status as SchoolStatus;
+      }
+      
       // Debug logging
-      console.log('getAllSchools service called with:', { page, limit, skip });
+      console.log('getAllSchools service called with:', { page, limit, skip, status });
       
       const [schools, total] = await this.schoolsRepository.findAndCount({
+        where: Object.keys(whereConditions).length > 0 ? whereConditions : undefined,
         relations: { createdBy: true },
         order: { createdAt: 'desc' },
         skip,
@@ -145,7 +152,29 @@ export class SuperAdminService {
   }
 
   // ========== USER MANAGEMENT ==========
+  /**
+   * Check if a school has at least one administrator
+   */
+  private async hasAdministrator(schoolId: number): Promise<boolean> {
+    const adminCount = await this.usersRepository.count({
+      where: {
+        schoolId,
+        role: UserRole.ADMINISTRATOR,
+      },
+    });
+    return adminCount > 0;
+  }
+
   async createUser(createUserDto: CreateUserDto) {
+    // If user has a schoolId and is not an administrator, ensure school has at least one administrator
+    if (createUserDto.schoolId && createUserDto.role !== UserRole.ADMINISTRATOR) {
+      const hasAdmin = await this.hasAdministrator(createUserDto.schoolId);
+      if (!hasAdmin) {
+        throw new BadRequestException(
+          'Each school must have at least one administrator. Please assign an administrator role to this user or ensure the school has an existing administrator.'
+        );
+      }
+    }
     return await this.usersService.create(createUserDto);
   }
 
@@ -194,19 +223,88 @@ export class SuperAdminService {
   }
 
   async updateUser(id: number, updateUserDto: UpdateUserDto) {
-    // Prevent changing SUPER_ADMIN role
     const user = await this.usersService.findOne(id);
-    if (user.role === 'super_admin' && updateUserDto.role && updateUserDto.role !== 'super_admin') {
+    
+    // Prevent changing SUPER_ADMIN role
+    if (user.role === UserRole.SUPER_ADMIN && updateUserDto.role && updateUserDto.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('Cannot change SUPER_ADMIN role');
     }
+
+    // Check if changing role from administrator to something else
+    const schoolId = updateUserDto.schoolId !== undefined ? updateUserDto.schoolId : user.schoolId;
+    const newRole = updateUserDto.role !== undefined ? updateUserDto.role : user.role;
+    
+    // If user is currently an administrator and role is being changed to non-administrator
+    if (user.role === UserRole.ADMINISTRATOR && newRole !== UserRole.ADMINISTRATOR && schoolId) {
+      // Count other administrators for this school (excluding current user)
+      const adminCount = await this.usersRepository.count({
+        where: {
+          schoolId,
+          role: UserRole.ADMINISTRATOR,
+        },
+      });
+
+      // If this is the only administrator, prevent the change
+      if (adminCount <= 1) {
+        throw new BadRequestException(
+          'Cannot change role: Each school must have at least one administrator. Please assign another user as administrator first.'
+        );
+      }
+    }
+
+    // If schoolId is being removed and user is an administrator, check if they're the last administrator
+    if (updateUserDto.schoolId === null && user.role === UserRole.ADMINISTRATOR && user.schoolId) {
+      const adminCount = await this.usersRepository.count({
+        where: {
+          schoolId: user.schoolId,
+          role: UserRole.ADMINISTRATOR,
+        },
+      });
+
+      if (adminCount <= 1) {
+        throw new BadRequestException(
+          'Cannot remove user from school: Each school must have at least one administrator. Please assign another user as administrator first.'
+        );
+      }
+    }
+
+    // If schoolId is being changed and new role is not administrator, ensure new school has an administrator
+    if (updateUserDto.schoolId !== undefined && updateUserDto.schoolId !== null && updateUserDto.schoolId !== user.schoolId && newRole !== UserRole.ADMINISTRATOR) {
+      const hasAdmin = await this.hasAdministrator(updateUserDto.schoolId);
+      if (!hasAdmin) {
+        throw new BadRequestException(
+          'Cannot assign user to this school: Each school must have at least one administrator. Please assign an administrator role to this user or ensure the school has an existing administrator.'
+        );
+      }
+    }
+
     return await this.usersService.update(id, updateUserDto);
   }
 
   async deleteUser(id: number) {
     const user = await this.usersService.findOne(id);
-    if (user.role === 'super_admin') {
+    
+    // Prevent deleting SUPER_ADMIN
+    if (user.role === UserRole.SUPER_ADMIN) {
       throw new BadRequestException('Cannot delete SUPER_ADMIN user');
     }
+
+    // Prevent deleting the last administrator of a school
+    if (user.role === UserRole.ADMINISTRATOR && user.schoolId) {
+      const adminCount = await this.usersRepository.count({
+        where: {
+          schoolId: user.schoolId,
+          role: UserRole.ADMINISTRATOR,
+        },
+      });
+
+      if (adminCount <= 1) {
+        throw new BadRequestException(
+          'Cannot delete user: Each school must have at least one administrator. Please assign another user as administrator before deleting this user.'
+        );
+      }
+    }
+
     return await this.usersService.remove(id);
   }
 
