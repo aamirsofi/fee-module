@@ -966,5 +966,34 @@ export class SuperAdminService {
     await this.feeStructuresRepository.remove(feeStructure);
     return { message: 'Fee structure deleted successfully' };
   }
+
+  // ========== SCHOOL CLASSES ==========
+  async getSchoolClasses(schoolId: number): Promise<string[]> {
+    // Verify school exists
+    const school = await this.schoolsRepository.findOne({
+      where: { id: schoolId },
+    });
+
+    if (!school) {
+      throw new NotFoundException(`School with ID ${schoolId} not found`);
+    }
+
+    // Fetch all students for the school to get unique classes
+    const students = await this.studentsRepository.find({
+      where: { schoolId },
+      select: ['class'],
+    });
+
+    // Extract unique classes, filter out null/empty values, and sort
+    const uniqueClasses = Array.from(
+      new Set(
+        students
+          .map((student) => student.class)
+          .filter((cls) => cls && cls.trim())
+      ),
+    ).sort() as string[];
+
+    return uniqueClasses;
+  }
 }
 

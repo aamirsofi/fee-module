@@ -4,13 +4,12 @@ import {
   FiTrash2,
   FiLoader,
   FiDollarSign,
-  FiChevronLeft,
-  FiChevronRight,
   FiX,
   FiSearch,
 } from "react-icons/fi";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+import Pagination from "../../components/Pagination";
 import { FeeStructure, FeeCategory, CategoryHead, School } from "../../types";
 
 interface PaginationMeta {
@@ -27,10 +26,20 @@ export default function FeePlan() {
   const [schools, setSchools] = useState<School[]>([]);
   const [feeCategories, setFeeCategories] = useState<FeeCategory[]>([]);
   const [categoryHeads, setCategoryHeads] = useState<CategoryHead[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingCategoryHeads, setLoadingCategoryHeads] = useState(false);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [createMode, setCreateMode] = useState<"single" | "multiple">("single");
+  const [selectedFeeCategoryIds, setSelectedFeeCategoryIds] = useState<
+    number[]
+  >([]);
+  const [selectedCategoryHeadIds, setSelectedCategoryHeadIds] = useState<
+    number[]
+  >([]);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(
     null
   );
@@ -79,9 +88,11 @@ export default function FeePlan() {
     if (formData.schoolId) {
       loadFeeCategories();
       loadCategoryHeads();
+      loadAvailableClasses();
     } else {
       setFeeCategories([]);
       setCategoryHeads([]);
+      setAvailableClasses([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.schoolId]);
@@ -184,6 +195,28 @@ export default function FeePlan() {
     }
   };
 
+  const loadAvailableClasses = async () => {
+    if (!formData.schoolId) return;
+
+    try {
+      setLoadingClasses(true);
+      // Fetch unique classes directly from the dedicated endpoint
+      const response = await api.instance.get(
+        `/super-admin/schools/${formData.schoolId}/classes`
+      );
+
+      // The endpoint returns an array of unique class names
+      const classes = Array.isArray(response.data) ? response.data : [];
+      setAvailableClasses(classes);
+    } catch (err: any) {
+      console.error("Error loading classes:", err);
+      console.error("Error details:", err.response?.data);
+      setAvailableClasses([]);
+    } finally {
+      setLoadingClasses(false);
+    }
+  };
+
   const loadFeeStructures = async () => {
     try {
       setLoading(true);
@@ -239,63 +272,234 @@ export default function FeePlan() {
         return;
       }
 
-      if (!formData.feeCategoryId) {
-        setError("Please select a fee heading");
-        return;
-      }
-
       if (!formData.amount || parseFloat(formData.amount) <= 0) {
         setError("Please enter a valid amount");
         return;
       }
 
-      // Auto-generate plan name from fee heading and category head
-      const selectedCategory = feeCategories.find(
-        (cat) => cat.id === parseInt(formData.feeCategoryId as string)
-      );
-      const selectedCategoryHead = categoryHeads.find(
-        (ch) => ch.id === parseInt(formData.categoryHeadId as string)
-      );
-
-      const planName = selectedCategory
-        ? `${selectedCategory.name}${
-            selectedCategoryHead ? ` - ${selectedCategoryHead.name}` : ""
-          }${formData.class ? ` (${formData.class})` : ""}`
-        : "Fee Plan";
-
-      const payload: any = {
-        name: planName,
-        feeCategoryId: parseInt(formData.feeCategoryId as string),
-        amount: parseFloat(formData.amount),
-        status: formData.status,
-      };
-
-      if (formData.categoryHeadId) {
-        payload.categoryHeadId = parseInt(formData.categoryHeadId as string);
-      }
-
-      if (formData.class.trim()) {
-        payload.class = formData.class.trim();
+      // Validate based on mode
+      if (createMode === "multiple") {
+        if (selectedFeeCategoryIds.length === 0) {
+          setError("Please select at least one fee heading");
+          return;
+        }
+        if (selectedClasses.length === 0) {
+          setError("Please select at least one class");
+          return;
+        }
+      } else {
+        if (!formData.feeCategoryId) {
+          setError("Please select a fee heading");
+          return;
+        }
       }
 
       const currentSchoolId = formData.schoolId;
 
       if (editingStructure) {
+        // Single edit mode
+        const selectedCategory = feeCategories.find(
+          (cat) => cat.id === parseInt(formData.feeCategoryId as string)
+        );
+        const selectedCategoryHead = categoryHeads.find(
+          (ch) => ch.id === parseInt(formData.categoryHeadId as string)
+        );
+
+        const basePlanName = selectedCategory
+          ? `${selectedCategory.name}${
+              selectedCategoryHead ? ` - ${selectedCategoryHead.name}` : ""
+            }`
+          : "Fee Plan";
+
+        const planName = `${basePlanName}${
+          formData.class ? ` (${formData.class})` : ""
+        }`;
+
+        const payload: any = {
+          name: planName,
+          feeCategoryId: parseInt(formData.feeCategoryId as string),
+          amount: parseFloat(formData.amount),
+          status: formData.status,
+        };
+
+        if (formData.categoryHeadId) {
+          payload.categoryHeadId = parseInt(formData.categoryHeadId as string);
+        }
+
+        if (formData.class.trim()) {
+          payload.class = formData.class.trim();
+        }
+
         await api.instance.patch(
           `/super-admin/fee-structures/${editingStructure.id}?schoolId=${currentSchoolId}`,
           payload
         );
         setSuccess("Fee plan updated successfully!");
+        setEditingStructure(null);
+        resetForm(true, currentSchoolId);
       } else {
-        await api.instance.post(
-          `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
-          payload
-        );
-        setSuccess("Fee plan created successfully!");
+        // Create mode
+        if (createMode === "multiple") {
+          // Generate all combinations
+          const combinations: Array<{
+            feeCategoryId: number;
+            categoryHeadId: number | null;
+            className: string;
+          }> = [];
+
+          // If no category heads selected, include null (General)
+          const categoryHeadIdsToUse =
+            selectedCategoryHeadIds.length > 0
+              ? selectedCategoryHeadIds
+              : [null];
+
+          selectedFeeCategoryIds.forEach((feeCategoryId) => {
+            categoryHeadIdsToUse.forEach((categoryHeadId) => {
+              selectedClasses.forEach((className) => {
+                combinations.push({
+                  feeCategoryId,
+                  categoryHeadId,
+                  className,
+                });
+              });
+            });
+          });
+
+          // Check for existing fee structures to avoid duplicates
+          const existingStructuresResponse = await api.instance.get(
+            "/super-admin/fee-structures",
+            {
+              params: {
+                schoolId: currentSchoolId,
+                limit: 10000, // Get all to check duplicates
+                page: 1,
+              },
+            }
+          );
+
+          const existingStructures = Array.isArray(
+            existingStructuresResponse.data.data
+          )
+            ? existingStructuresResponse.data.data
+            : Array.isArray(existingStructuresResponse.data)
+            ? existingStructuresResponse.data
+            : [];
+
+          // Filter out duplicates
+          const newCombinations = combinations.filter((combo) => {
+            return !existingStructures.some((existing: any) => {
+              const matchesFeeCategory =
+                existing.feeCategoryId === combo.feeCategoryId;
+              const matchesCategoryHead =
+                existing.categoryHeadId === combo.categoryHeadId ||
+                (!existing.categoryHeadId && !combo.categoryHeadId);
+              const matchesClass =
+                existing.class === combo.className ||
+                (!existing.class && !combo.className);
+
+              return matchesFeeCategory && matchesCategoryHead && matchesClass;
+            });
+          });
+
+          const duplicateCount = combinations.length - newCombinations.length;
+
+          if (newCombinations.length === 0) {
+            setError(
+              `All ${combinations.length} fee plan(s) already exist. No new plans created.`
+            );
+            setTimeout(() => setError(""), 5000);
+            return;
+          }
+
+          // Create only new combinations
+          const promises = newCombinations.map((combo) => {
+            const feeCategory = feeCategories.find(
+              (cat) => cat.id === combo.feeCategoryId
+            );
+            const categoryHead = combo.categoryHeadId
+              ? categoryHeads.find((ch) => ch.id === combo.categoryHeadId)
+              : null;
+
+            const planName = `${feeCategory?.name || "Fee Plan"}${
+              categoryHead ? ` - ${categoryHead.name}` : ""
+            }${combo.className ? ` (${combo.className})` : ""}`;
+
+            const payload: any = {
+              name: planName,
+              feeCategoryId: combo.feeCategoryId,
+              amount: parseFloat(formData.amount),
+              status: formData.status,
+            };
+
+            if (combo.categoryHeadId) {
+              payload.categoryHeadId = combo.categoryHeadId;
+            }
+
+            if (combo.className) {
+              payload.class = combo.className;
+            }
+
+            return api.instance.post(
+              `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
+              payload
+            );
+          });
+
+          await Promise.all(promises);
+
+          let successMessage = `Successfully created ${newCombinations.length} fee plan(s)!`;
+          if (duplicateCount > 0) {
+            successMessage += ` (${duplicateCount} already existed and were skipped)`;
+          }
+          setSuccess(successMessage);
+          setSelectedFeeCategoryIds([]);
+          setSelectedCategoryHeadIds([]);
+          setSelectedClasses([]);
+        } else {
+          // Single create mode
+          const selectedCategory = feeCategories.find(
+            (cat) => cat.id === parseInt(formData.feeCategoryId as string)
+          );
+          const selectedCategoryHead = categoryHeads.find(
+            (ch) => ch.id === parseInt(formData.categoryHeadId as string)
+          );
+
+          const basePlanName = selectedCategory
+            ? `${selectedCategory.name}${
+                selectedCategoryHead ? ` - ${selectedCategoryHead.name}` : ""
+              }`
+            : "Fee Plan";
+
+          const planName = `${basePlanName}${
+            formData.class ? ` (${formData.class})` : ""
+          }`;
+
+          const payload: any = {
+            name: planName,
+            feeCategoryId: parseInt(formData.feeCategoryId as string),
+            amount: parseFloat(formData.amount),
+            status: formData.status,
+          };
+
+          if (formData.categoryHeadId) {
+            payload.categoryHeadId = parseInt(
+              formData.categoryHeadId as string
+            );
+          }
+
+          if (formData.class.trim()) {
+            payload.class = formData.class.trim();
+          }
+
+          await api.instance.post(
+            `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
+            payload
+          );
+          setSuccess("Fee plan created successfully!");
+        }
+        resetForm(true, currentSchoolId);
       }
 
-      setEditingStructure(null);
-      resetForm(true, currentSchoolId);
       loadFeeStructures();
 
       setTimeout(() => setSuccess(""), 5000);
@@ -319,6 +523,10 @@ export default function FeePlan() {
       status: "active",
       schoolId: retainSchool && schoolId ? schoolId : "",
     });
+    setCreateMode("single");
+    setSelectedFeeCategoryIds([]);
+    setSelectedCategoryHeadIds([]);
+    setSelectedClasses([]);
   };
 
   const handleEdit = (structure: FeeStructure) => {
@@ -368,6 +576,17 @@ export default function FeePlan() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="card-modern rounded-xl p-4">
+        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+          Fee Plan Management
+        </h1>
+        <p className="text-gray-600 text-sm mt-1">
+          Create and manage fee plans by combining fee categories with category
+          heads
+        </p>
+      </div>
+
       {/* Success/Error Messages */}
       {success && (
         <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
@@ -380,33 +599,22 @@ export default function FeePlan() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-          Fee Plan Management
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">
-          Create and manage fee plans by combining fee categories with category
-          heads
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side - Add/Edit Form */}
-        <div className="card-modern rounded-xl p-6 lg:col-span-1">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">
+        <div className="card-modern rounded-xl p-4 lg:col-span-1">
+          <h2 className="text-lg font-bold text-gray-800 mb-3">
             {editingStructure ? "Edit Fee Plan" : "Add Fee Plan"}
           </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">
                 School <span className="text-red-500">*</span>
               </label>
               {loadingSchools ? (
-                <div className="flex items-center justify-center py-4">
-                  <FiLoader className="w-5 h-5 animate-spin text-indigo-600" />
-                  <span className="ml-2 text-gray-600">Loading schools...</span>
+                <div className="flex items-center justify-center py-2">
+                  <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                  <span className="ml-2 text-xs text-gray-600">Loading...</span>
                 </div>
               ) : (
                 <CustomDropdown
@@ -430,18 +638,33 @@ export default function FeePlan() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fee Heading <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="block text-xs font-medium text-gray-700">
+                  Fee Heading <span className="text-red-500">*</span>
+                </label>
+                {formData.schoolId && feeCategories.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCreateMode(
+                        createMode === "single" ? "multiple" : "single"
+                      )
+                    }
+                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    {createMode === "single" ? "Bulk" : "Single"}
+                  </button>
+                )}
+              </div>
               {!formData.schoolId ? (
-                <div className="px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
-                  Please select a school first
+                <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                  Select school first
                 </div>
               ) : loadingCategories ? (
-                <div className="flex items-center justify-center py-2">
-                  <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                <div className="flex items-center justify-center py-1">
+                  <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
                 </div>
-              ) : (
+              ) : createMode === "single" ? (
                 <CustomDropdown
                   options={feeCategories.map((cat) => ({
                     value: cat.id.toString(),
@@ -458,12 +681,75 @@ export default function FeePlan() {
                   className="w-full"
                   disabled={!formData.schoolId}
                 />
+              ) : (
+                <div className="space-y-1">
+                  <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
+                    {/* Select All */}
+                    <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
+                      <input
+                        type="checkbox"
+                        checked={
+                          feeCategories.length > 0 &&
+                          selectedFeeCategoryIds.length === feeCategories.length
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedFeeCategoryIds(
+                              feeCategories.map((cat) => cat.id)
+                            );
+                          } else {
+                            setSelectedFeeCategoryIds([]);
+                          }
+                        }}
+                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="ml-1.5 text-xs font-semibold text-indigo-700">
+                        All ({feeCategories.length})
+                      </span>
+                    </label>
+                    {feeCategories.map((cat) => (
+                      <label
+                        key={cat.id}
+                        className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedFeeCategoryIds.includes(cat.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedFeeCategoryIds([
+                                ...selectedFeeCategoryIds,
+                                cat.id,
+                              ]);
+                            } else {
+                              setSelectedFeeCategoryIds(
+                                selectedFeeCategoryIds.filter(
+                                  (id) => id !== cat.id
+                                )
+                              );
+                            }
+                          }}
+                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="ml-1.5 text-xs text-gray-700">
+                          {cat.name} ({cat.type})
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {createMode === "multiple" &&
+                    selectedFeeCategoryIds.length > 0 && (
+                      <div className="text-xs text-gray-600">
+                        {selectedFeeCategoryIds.length} selected
+                      </div>
+                    )}
+                </div>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fee Value (Amount) <span className="text-red-500">*</span>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                Amount <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -476,33 +762,28 @@ export default function FeePlan() {
                 placeholder="0.00"
                 required
                 disabled={!formData.schoolId}
-                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
+                className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
                   !formData.schoolId
                     ? "bg-gray-50 text-gray-400 cursor-not-allowed"
                     : "bg-white"
                 }`}
               />
-              {!formData.schoolId && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Please select a school first
-                </p>
-              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">
                 Category Head{" "}
-                <span className="text-gray-500 text-xs">(Optional)</span>
+                <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
               {!formData.schoolId ? (
-                <div className="px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
-                  Please select a school first
+                <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                  Select school first
                 </div>
               ) : loadingCategoryHeads ? (
-                <div className="flex items-center justify-center py-2">
-                  <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                <div className="flex items-center justify-center py-1">
+                  <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
                 </div>
-              ) : (
+              ) : createMode === "single" ? (
                 <CustomDropdown
                   options={[
                     { value: "", label: "None (General)" },
@@ -522,31 +803,169 @@ export default function FeePlan() {
                   className="w-full"
                   disabled={!formData.schoolId}
                 />
+              ) : (
+                <div className="space-y-1">
+                  <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
+                    {/* Select All */}
+                    {categoryHeads.length > 0 && (
+                      <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
+                        <input
+                          type="checkbox"
+                          checked={
+                            categoryHeads.length > 0 &&
+                            selectedCategoryHeadIds.length ===
+                              categoryHeads.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCategoryHeadIds(
+                                categoryHeads.map((ch) => ch.id)
+                              );
+                            } else {
+                              setSelectedCategoryHeadIds([]);
+                            }
+                          }}
+                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="ml-1.5 text-xs font-semibold text-indigo-700">
+                          All ({categoryHeads.length})
+                        </span>
+                      </label>
+                    )}
+                    {categoryHeads.map((ch) => (
+                      <label
+                        key={ch.id}
+                        className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCategoryHeadIds.includes(ch.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCategoryHeadIds([
+                                ...selectedCategoryHeadIds,
+                                ch.id,
+                              ]);
+                            } else {
+                              setSelectedCategoryHeadIds(
+                                selectedCategoryHeadIds.filter(
+                                  (id) => id !== ch.id
+                                )
+                              );
+                            }
+                          }}
+                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="ml-1.5 text-xs text-gray-700">
+                          {ch.name}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedCategoryHeadIds.length > 0 && (
+                    <div className="text-xs text-gray-600">
+                      {selectedCategoryHeadIds.length} selected
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Class (Optional)
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                Class <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
-              <input
-                type="text"
-                value={formData.class}
-                onChange={(e) =>
-                  setFormData({ ...formData, class: e.target.value })
-                }
-                placeholder="e.g., Grade 1, Grade 2"
-                disabled={!formData.schoolId}
-                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
-                  !formData.schoolId
-                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                    : "bg-white"
-                }`}
-              />
+              {createMode === "single" ? (
+                <input
+                  type="text"
+                  value={formData.class}
+                  onChange={(e) =>
+                    setFormData({ ...formData, class: e.target.value })
+                  }
+                  placeholder="e.g., Grade 1"
+                  disabled={!formData.schoolId}
+                  className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
+                    !formData.schoolId
+                      ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                      : "bg-white"
+                  }`}
+                />
+              ) : (
+                <div className="space-y-1">
+                  {loadingClasses ? (
+                    <div className="flex items-center justify-center py-2">
+                      <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
+                      <span className="ml-1.5 text-xs text-gray-600">
+                        Loading...
+                      </span>
+                    </div>
+                  ) : availableClasses.length === 0 ? (
+                    <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                      No classes found
+                    </div>
+                  ) : (
+                    <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
+                      {/* Select All */}
+                      <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
+                        <input
+                          type="checkbox"
+                          checked={
+                            availableClasses.length > 0 &&
+                            selectedClasses.length === availableClasses.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedClasses([...availableClasses]);
+                            } else {
+                              setSelectedClasses([]);
+                            }
+                          }}
+                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="ml-1.5 text-xs font-semibold text-indigo-700">
+                          All ({availableClasses.length})
+                        </span>
+                      </label>
+                      {availableClasses.map((className) => (
+                        <label
+                          key={className}
+                          className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedClasses.includes(className)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedClasses([
+                                  ...selectedClasses,
+                                  className,
+                                ]);
+                              } else {
+                                setSelectedClasses(
+                                  selectedClasses.filter((c) => c !== className)
+                                );
+                              }
+                            }}
+                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span className="ml-1.5 text-xs text-gray-700">
+                            {className}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {selectedClasses.length > 0 && (
+                    <div className="text-xs text-gray-600">
+                      {selectedClasses.length} selected
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">
                 Status <span className="text-red-500">*</span>
               </label>
               <CustomDropdown
@@ -566,31 +985,59 @@ export default function FeePlan() {
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
+            {/* Preview for multiple mode */}
+            {createMode === "multiple" &&
+              !editingStructure &&
+              selectedFeeCategoryIds.length > 0 &&
+              selectedClasses.length > 0 && (
+                <div className="p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <p className="text-xs font-semibold text-indigo-900">
+                    Will create{" "}
+                    {selectedFeeCategoryIds.length *
+                      (selectedCategoryHeadIds.length > 0
+                        ? selectedCategoryHeadIds.length
+                        : 1) *
+                      selectedClasses.length}{" "}
+                    plan(s) (duplicates skipped)
+                  </p>
+                </div>
+              )}
+
+            <div className="flex gap-2 pt-1">
               <button
                 type="submit"
                 disabled={!formData.schoolId}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-semibold shadow-lg transition-all ${
+                className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold shadow transition-all ${
                   !formData.schoolId
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-xl"
+                    : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
                 }`}
               >
-                {editingStructure ? "Update" : "Create"}
+                {editingStructure
+                  ? "Update"
+                  : createMode === "multiple"
+                  ? `Create ${
+                      selectedFeeCategoryIds.length *
+                      (selectedCategoryHeadIds.length > 0
+                        ? selectedCategoryHeadIds.length
+                        : 1) *
+                      selectedClasses.length
+                    }`
+                  : "Create"}
               </button>
               {editingStructure && (
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="px-4 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-smooth"
+                  className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-smooth"
                 >
                   Cancel
                 </button>
               )}
             </div>
             {!formData.schoolId && (
-              <p className="text-xs text-gray-500 text-center mt-2">
-                ⚠️ Please select a school to continue
+              <p className="text-xs text-gray-500 text-center mt-1">
+                ⚠️ Select school first
               </p>
             )}
           </form>
@@ -774,102 +1221,18 @@ export default function FeePlan() {
               </div>
 
               {/* Pagination */}
-              {paginationMeta && paginationMeta.totalPages > 1 && (
-                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-sm text-gray-700">
-                    Showing {(page - 1) * limit + 1} to{" "}
-                    {Math.min(page * limit, paginationMeta.total)} of{" "}
-                    {paginationMeta.total} results
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-semibold text-gray-800 whitespace-nowrap">
-                      Per page:
-                    </label>
-                    <div className="relative z-10">
-                      <CustomDropdown
-                        options={[
-                          { value: "10", label: "10" },
-                          { value: "20", label: "20" },
-                          { value: "50", label: "50" },
-                          { value: "100", label: "100" },
-                        ]}
-                        value={limit.toString()}
-                        onChange={(value) => {
-                          setLimit(parseInt(value as string));
-                          setPage(1);
-                        }}
-                        className="w-20"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={!paginationMeta.hasPrevPage}
-                      className={`px-4 py-2.5 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold ${
-                        paginationMeta.hasPrevPage
-                          ? "bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/20 border border-gray-200"
-                          : "bg-gray-100/50 text-gray-400 cursor-not-allowed opacity-50"
-                      }`}
-                    >
-                      <FiChevronLeft className="w-4 h-4" />
-                      <span className="hidden sm:inline">Prev</span>
-                    </button>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from(
-                        { length: Math.min(7, paginationMeta.totalPages) },
-                        (_, i) => {
-                          let pageNum: number;
-                          if (paginationMeta.totalPages <= 7) {
-                            pageNum = i + 1;
-                          } else if (page <= 4) {
-                            pageNum = i + 1;
-                          } else if (page >= paginationMeta.totalPages - 3) {
-                            pageNum = paginationMeta.totalPages - 6 + i;
-                          } else {
-                            pageNum = page - 3 + i;
-                          }
-
-                          const isActive = pageNum === page;
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setPage(pageNum)}
-                              className={`min-w-[40px] h-10 rounded-xl transition-all duration-200 text-sm font-semibold ${
-                                isActive
-                                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 scale-110 ring-2 ring-indigo-300/50"
-                                  : "bg-white/60 backdrop-blur-sm text-gray-700 hover:bg-white hover:scale-105 hover:shadow-md border border-gray-200"
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        }
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() =>
-                        setPage((p) =>
-                          Math.min(paginationMeta.totalPages, p + 1)
-                        )
-                      }
-                      disabled={!paginationMeta.hasNextPage}
-                      className={`px-4 py-2.5 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold ${
-                        paginationMeta.hasNextPage
-                          ? "bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/20 border border-gray-200"
-                          : "bg-gray-100/50 text-gray-400 cursor-not-allowed opacity-50"
-                      }`}
-                    >
-                      <span className="hidden sm:inline">Next</span>
-                      <FiChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
+              <Pagination
+                paginationMeta={paginationMeta}
+                page={page}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
+                itemName="fee plans"
+                className="mt-6"
+              />
             </>
           )}
         </div>

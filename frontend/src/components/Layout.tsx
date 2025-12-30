@@ -22,6 +22,7 @@ import {
   FiChevronUp,
   FiUpload,
   FiTag,
+  FiBook,
 } from "react-icons/fi";
 
 interface LayoutProps {
@@ -171,6 +172,18 @@ export default function Layout({ children }: LayoutProps) {
               name: "Route Plan",
               path: "/super-admin/settings/fee-settings/fee-heads/route-plan",
               icon: FiMapPin,
+            },
+          ],
+        },
+        {
+          name: "Academics",
+          icon: FiBook,
+          section: "academics",
+          children: [
+            {
+              name: "Class",
+              path: "/super-admin/settings/academics/class",
+              icon: FiBook,
             },
           ],
         },

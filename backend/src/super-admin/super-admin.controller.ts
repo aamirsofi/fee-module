@@ -158,6 +158,15 @@ export class SuperAdminController {
     return this.superAdminService.getSchoolDetails(+id);
   }
 
+  @Get('schools/:id/classes')
+  @ApiOperation({ summary: 'Get unique classes for a school (Super Admin only)' })
+  @ApiParam({ name: 'id', description: 'School ID', type: Number })
+  @ApiResponse({ status: 200, description: 'List of unique classes', schema: { type: 'array', items: { type: 'string' } } })
+  @ApiResponse({ status: 404, description: 'School not found' })
+  getSchoolClasses(@Param('id') id: string) {
+    return this.superAdminService.getSchoolClasses(+id);
+  }
+
   @Patch('schools/:id')
   @ApiOperation({ summary: 'Update school (Super Admin only)' })
   @ApiOkResponse({ type: School, description: 'School updated successfully' })

@@ -16,6 +16,7 @@ import { StudentFeeStructuresModule } from './student-fee-structures/student-fee
 import { SchoolContextModule } from './middleware/school-context.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { CategoryHeadsModule } from './category-heads/category-heads.module';
+import { ClassesModule } from './classes/classes.module';
 import { DatabaseConfig } from './database/database.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -56,6 +57,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     StudentFeeStructuresModule,
     SuperAdminModule,
     CategoryHeadsModule,
+    ClassesModule,
   ],
   controllers: [AppController],
   providers: [

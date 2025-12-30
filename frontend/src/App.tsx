@@ -15,6 +15,7 @@ import BulkImportStudents from './pages/super-admin/BulkImportStudents';
 import FeeHeading from './pages/super-admin/FeeHeading';
 import CategoryHeads from './pages/super-admin/CategoryHeads';
 import FeePlan from './pages/super-admin/FeePlan';
+import Classes from './pages/super-admin/Classes';
 import Profile from './pages/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -89,6 +90,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <FeePlan />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/settings/academics/class"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Classes />
                 </Layout>
               </ProtectedRoute>
             }

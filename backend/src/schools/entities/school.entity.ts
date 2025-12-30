@@ -14,6 +14,7 @@ import { FeeCategory } from '../../fee-categories/entities/fee-category.entity';
 import { FeeStructure } from '../../fee-structures/entities/fee-structure.entity';
 import { Payment } from '../../payments/entities/payment.entity';
 import { CategoryHead } from '../../category-heads/entities/category-head.entity';
+import { Class } from '../../classes/entities/class.entity';
 
 export enum SchoolStatus {
   ACTIVE = 'active',
@@ -75,6 +76,9 @@ export class School {
 
   @OneToMany(() => CategoryHead, (categoryHead) => categoryHead.school)
   categoryHeads!: CategoryHead[];
+
+  @OneToMany(() => Class, (classEntity) => classEntity.school)
+  classes!: Class[];
 
   @CreateDateColumn()
   createdAt!: Date;

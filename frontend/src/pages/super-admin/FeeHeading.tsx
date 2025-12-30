@@ -49,8 +49,12 @@ interface PaginationMeta {
 export default function FeeHeading() {
   const [feeCategories, setFeeCategories] = useState<FeeCategory[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSchools, setLoadingSchools] = useState(true);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [createMode, setCreateMode] = useState<"single" | "multiple">("single");
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [editingCategory, setEditingCategory] = useState<FeeCategory | null>(
     null
   );
@@ -82,6 +86,46 @@ export default function FeeHeading() {
     loadSchools();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (formData.schoolId) {
+      loadAvailableClasses();
+    } else {
+      setAvailableClasses([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.schoolId]);
+
+  const loadAvailableClasses = async () => {
+    if (!formData.schoolId) return;
+
+    try {
+      setLoadingClasses(true);
+      // Fetch students for the school to get unique classes
+      // Use school details endpoint which includes students
+      const response = await api.instance.get(
+        `/super-admin/schools/${formData.schoolId}/details`
+      );
+
+      const students = response.data?.students || [];
+
+      // Extract unique classes
+      const uniqueClasses = Array.from(
+        new Set(
+          students
+            .map((student: any) => student.class)
+            .filter((cls: string) => cls && cls.trim())
+        )
+      ).sort() as string[];
+
+      setAvailableClasses(uniqueClasses);
+    } catch (err: any) {
+      console.error("Error loading classes:", err);
+      setAvailableClasses([]);
+    } finally {
+      setLoadingClasses(false);
+    }
+  };
 
   const loadSchools = async () => {
     try {
@@ -180,8 +224,16 @@ export default function FeeHeading() {
         return;
       }
 
-      const payload: any = {
-        name: formData.name.trim(),
+      if (
+        createMode === "multiple" &&
+        selectedClasses.length === 0 &&
+        !editingCategory
+      ) {
+        setError("Please select at least one class");
+        return;
+      }
+
+      const basePayload: any = {
         description: formData.description.trim() || undefined,
         type: formData.type,
         status: formData.status,
@@ -189,14 +241,18 @@ export default function FeeHeading() {
 
       // Include applicableMonths if selected, otherwise send empty array (means all months)
       if (formData.applicableMonths.length > 0) {
-        payload.applicableMonths = formData.applicableMonths;
+        basePayload.applicableMonths = formData.applicableMonths;
       } else {
-        payload.applicableMonths = [];
+        basePayload.applicableMonths = [];
       }
 
       const currentSchoolId = formData.schoolId;
 
       if (editingCategory) {
+        const payload = {
+          ...basePayload,
+          name: formData.name.trim(),
+        };
         await api.instance.patch(
           `/super-admin/fee-categories/${editingCategory.id}?schoolId=${formData.schoolId}`,
           payload
@@ -205,11 +261,35 @@ export default function FeeHeading() {
         setEditingCategory(null);
         resetForm();
       } else {
-        await api.instance.post(
-          `/super-admin/fee-categories?schoolId=${formData.schoolId}`,
-          payload
-        );
-        setSuccess("Fee category created successfully!");
+        // Handle multiple classes creation
+        if (createMode === "multiple" && selectedClasses.length > 0) {
+          const promises = selectedClasses.map((className) => {
+            const payload = {
+              ...basePayload,
+              name: `${formData.name.trim()} - ${className}`,
+            };
+            return api.instance.post(
+              `/super-admin/fee-categories?schoolId=${currentSchoolId}`,
+              payload
+            );
+          });
+
+          await Promise.all(promises);
+          setSuccess(
+            `Successfully created ${selectedClasses.length} fee heading(s) for selected classes!`
+          );
+          setSelectedClasses([]);
+        } else {
+          const payload = {
+            ...basePayload,
+            name: formData.name.trim(),
+          };
+          await api.instance.post(
+            `/super-admin/fee-categories?schoolId=${formData.schoolId}`,
+            payload
+          );
+          setSuccess("Fee category created successfully!");
+        }
         // Retain school selection when creating new category
         resetForm(true, currentSchoolId);
       }
@@ -237,6 +317,8 @@ export default function FeeHeading() {
       schoolId: retainSchool && schoolId ? schoolId : "",
       applicableMonths: [],
     });
+    setCreateMode("single");
+    setSelectedClasses([]);
   };
 
   const handleEdit = (category: FeeCategory) => {
@@ -344,19 +426,105 @@ export default function FeeHeading() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category Name <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Category Name <span className="text-red-500">*</span>
+                </label>
+                {formData.schoolId && availableClasses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCreateMode(
+                        createMode === "single" ? "multiple" : "single"
+                      )
+                    }
+                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    {createMode === "single"
+                      ? "Create for Multiple Classes"
+                      : "Single Mode"}
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                placeholder="e.g., Tuition Fee, Library Fee"
+                placeholder={
+                  createMode === "multiple"
+                    ? "e.g., Tuition Fee (will append class names)"
+                    : "e.g., Tuition Fee, Library Fee"
+                }
                 required
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth bg-white"
+                disabled={!formData.schoolId}
+                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
+                  !formData.schoolId
+                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                    : "bg-white"
+                }`}
               />
+              {createMode === "multiple" && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Class names will be appended automatically (e.g., "Tuition Fee
+                  - Grade 1")
+                </p>
+              )}
+              {createMode === "multiple" && (
+                <div className="mt-3 space-y-2">
+                  {loadingClasses ? (
+                    <div className="flex items-center justify-center py-4">
+                      <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                      <span className="ml-2 text-sm text-gray-600">
+                        Loading classes...
+                      </span>
+                    </div>
+                  ) : availableClasses.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                      No classes found. Add students to this school first.
+                    </div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-2 bg-white">
+                      {availableClasses.map((className) => (
+                        <label
+                          key={className}
+                          className="flex items-center px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedClasses.includes(className)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedClasses([
+                                  ...selectedClasses,
+                                  className,
+                                ]);
+                              } else {
+                                setSelectedClasses(
+                                  selectedClasses.filter((c) => c !== className)
+                                );
+                              }
+                            }}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">
+                            {className}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {selectedClasses.length > 0 && (
+                    <div className="text-xs text-gray-600">
+                      {selectedClasses.length} class(es) selected - Will create:{" "}
+                      {selectedClasses
+                        .map((c) => `"${formData.name || "Fee"} - ${c}"`)
+                        .join(", ")}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
