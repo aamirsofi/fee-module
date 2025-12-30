@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FiEdit,
   FiTrash2,
@@ -8,7 +8,10 @@ import {
   FiChevronRight,
   FiX,
   FiSearch,
+  FiUpload,
+  FiDownload,
 } from "react-icons/fi";
+import { useDropzone } from "react-dropzone";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 
@@ -49,15 +52,12 @@ interface PaginationMeta {
 export default function FeeHeading() {
   const [feeCategories, setFeeCategories] = useState<FeeCategory[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
-  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSchools, setLoadingSchools] = useState(true);
-  const [loadingClasses, setLoadingClasses] = useState(false);
-  const [createMode, setCreateMode] = useState<"single" | "multiple">("single");
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [editingCategory, setEditingCategory] = useState<FeeCategory | null>(
     null
   );
+  const [mode, setMode] = useState<"add" | "import">("add");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -66,6 +66,17 @@ export default function FeeHeading() {
     schoolId: "" as string | number,
     applicableMonths: [] as number[],
   });
+  const [importSchoolId, setImportSchoolId] = useState<string | number>("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: number;
+    failed: number;
+    skipped: number;
+    errors: Array<{ row: number; error: string }>;
+    duplicates: Array<{ row: number; name: string; reason: string }>;
+  } | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [page, setPage] = useState(1);
@@ -86,46 +97,6 @@ export default function FeeHeading() {
     loadSchools();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (formData.schoolId) {
-      loadAvailableClasses();
-    } else {
-      setAvailableClasses([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.schoolId]);
-
-  const loadAvailableClasses = async () => {
-    if (!formData.schoolId) return;
-
-    try {
-      setLoadingClasses(true);
-      // Fetch students for the school to get unique classes
-      // Use school details endpoint which includes students
-      const response = await api.instance.get(
-        `/super-admin/schools/${formData.schoolId}/details`
-      );
-
-      const students = response.data?.students || [];
-
-      // Extract unique classes
-      const uniqueClasses = Array.from(
-        new Set(
-          students
-            .map((student: any) => student.class)
-            .filter((cls: string) => cls && cls.trim())
-        )
-      ).sort() as string[];
-
-      setAvailableClasses(uniqueClasses);
-    } catch (err: any) {
-      console.error("Error loading classes:", err);
-      setAvailableClasses([]);
-    } finally {
-      setLoadingClasses(false);
-    }
-  };
 
   const loadSchools = async () => {
     try {
@@ -224,15 +195,6 @@ export default function FeeHeading() {
         return;
       }
 
-      if (
-        createMode === "multiple" &&
-        selectedClasses.length === 0 &&
-        !editingCategory
-      ) {
-        setError("Please select at least one class");
-        return;
-      }
-
       const basePayload: any = {
         description: formData.description.trim() || undefined,
         type: formData.type,
@@ -261,35 +223,15 @@ export default function FeeHeading() {
         setEditingCategory(null);
         resetForm();
       } else {
-        // Handle multiple classes creation
-        if (createMode === "multiple" && selectedClasses.length > 0) {
-          const promises = selectedClasses.map((className) => {
-            const payload = {
-              ...basePayload,
-              name: `${formData.name.trim()} - ${className}`,
-            };
-            return api.instance.post(
-              `/super-admin/fee-categories?schoolId=${currentSchoolId}`,
-              payload
-            );
-          });
-
-          await Promise.all(promises);
-          setSuccess(
-            `Successfully created ${selectedClasses.length} fee heading(s) for selected classes!`
-          );
-          setSelectedClasses([]);
-        } else {
-          const payload = {
-            ...basePayload,
-            name: formData.name.trim(),
-          };
-          await api.instance.post(
-            `/super-admin/fee-categories?schoolId=${formData.schoolId}`,
-            payload
-          );
-          setSuccess("Fee category created successfully!");
-        }
+        const payload = {
+          ...basePayload,
+          name: formData.name.trim(),
+        };
+        await api.instance.post(
+          `/super-admin/fee-categories?schoolId=${formData.schoolId}`,
+          payload
+        );
+        setSuccess("Fee category created successfully!");
         // Retain school selection when creating new category
         resetForm(true, currentSchoolId);
       }
@@ -317,11 +259,10 @@ export default function FeeHeading() {
       schoolId: retainSchool && schoolId ? schoolId : "",
       applicableMonths: [],
     });
-    setCreateMode("single");
-    setSelectedClasses([]);
   };
 
   const handleEdit = (category: FeeCategory) => {
+    setMode("add"); // Switch to Add Fee Category tab
     setEditingCategory(category);
     setFormData({
       name: category.name,
@@ -331,6 +272,7 @@ export default function FeeHeading() {
       schoolId: category.schoolId,
       applicableMonths: category.applicableMonths || [],
     });
+    setSelectedSchoolId(category.schoolId); // Set selected school for filtering
     setError("");
     setSuccess("");
   };
@@ -366,6 +308,319 @@ export default function FeeHeading() {
     setSuccess("");
   };
 
+  // Download sample CSV
+  const downloadSampleCSV = () => {
+    if (!importSchoolId) {
+      setError("Please select a school first");
+      return;
+    }
+
+    const headers = [
+      "schoolId",
+      "name",
+      "description",
+      "type",
+      "status",
+      "applicableMonths",
+    ];
+    const sampleRow = [
+      importSchoolId.toString(),
+      "Tuition Fee",
+      "Monthly tuition fee",
+      "school",
+      "active",
+      "1,2,3,4,5,6,7,8,9,10,11,12", // All months
+    ];
+
+    const csvContent = [headers.join(","), sampleRow.join(",")].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `fee_categories_sample_${importSchoolId}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Parse CSV file
+  const parseCSV = useCallback(
+    (file: File): Promise<any[]> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const text = e.target?.result as string;
+            const lines = text.split("\n").filter((line) => line.trim());
+
+            if (lines.length < 2) {
+              reject(
+                new Error(
+                  "CSV file must have at least a header row and one data row"
+                )
+              );
+              return;
+            }
+
+            const headers = lines[0]
+              .split(",")
+              .map((h) => h.trim().toLowerCase());
+            const data: any[] = [];
+
+            for (let i = 1; i < lines.length; i++) {
+              const values = lines[i].split(",").map((v) => v.trim());
+              const row: any = {};
+
+              headers.forEach((header, index) => {
+                row[header] = values[index] || "";
+              });
+
+              if (row.name) {
+                // Parse applicable months if provided
+                let applicableMonths: number[] = [];
+                if (row.applicablemonths) {
+                  const monthsStr = row.applicablemonths;
+                  if (monthsStr) {
+                    applicableMonths = monthsStr
+                      .split(",")
+                      .map((m: string) => parseInt(m.trim()))
+                      .filter((m: number) => !isNaN(m) && m >= 1 && m <= 12);
+                  }
+                }
+
+                data.push({
+                  schoolId: row.schoolid || importSchoolId,
+                  name: row.name,
+                  description: row.description || "",
+                  type: (row.type || "school").toLowerCase(),
+                  status: row.status || "active",
+                  applicableMonths:
+                    applicableMonths.length > 0 ? applicableMonths : undefined,
+                });
+              }
+            }
+
+            resolve(data);
+          } catch (err) {
+            reject(new Error("Failed to parse CSV file"));
+          }
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsText(file);
+      });
+    },
+    [importSchoolId]
+  );
+
+  // Handle file drop
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      const file = acceptedFiles[0];
+      if (!file) return;
+
+      if (!importSchoolId) {
+        setError("Please select a school first");
+        return;
+      }
+
+      if (!file.name.match(/\.(csv)$/i)) {
+        setError("Please upload a CSV file");
+        return;
+      }
+
+      try {
+        setImportFile(file);
+        const data = await parseCSV(file);
+        setImportPreview(data.slice(0, 10)); // Preview first 10 rows
+        setError("");
+      } catch (err: any) {
+        setError(err.message || "Failed to parse CSV file");
+        setImportFile(null);
+        setImportPreview([]);
+      }
+    },
+    [importSchoolId, parseCSV]
+  );
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "text/csv": [".csv"],
+    },
+    multiple: false,
+  });
+
+  // Handle bulk import
+  const handleBulkImport = async () => {
+    if (!importFile || !importSchoolId) {
+      setError("Please select a school and upload a CSV file");
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      setError("");
+      setSuccess("");
+      setImportResult(null);
+
+      const categoriesData = await parseCSV(importFile);
+
+      if (categoriesData.length === 0) {
+        setError("No valid fee categories found in CSV file");
+        return;
+      }
+
+      // Fetch existing categories for duplicate checking
+      const existingCategoriesResponse = await api.instance.get(
+        "/super-admin/fee-categories",
+        {
+          params: { schoolId: importSchoolId, limit: 1000 },
+        }
+      );
+      const existingCategories =
+        existingCategoriesResponse.data.data ||
+        existingCategoriesResponse.data ||
+        [];
+      // Create a Set using composite key: name + type (since same name can exist with different types)
+      const existingCategoryKeys = new Set(
+        existingCategories.map(
+          (cat: FeeCategory) =>
+            `${cat.name.toLowerCase().trim()}_${cat.type.toLowerCase()}`
+        )
+      );
+
+      // Check for duplicates within CSV using composite key: name + type
+      const csvCategoryKeys = new Map<string, number[]>(); // "name_type" -> array of row numbers
+      categoriesData.forEach((categoryData, index) => {
+        const name = categoryData.name.toLowerCase().trim();
+        const type = (categoryData.type || "school").toLowerCase();
+        const key = `${name}_${type}`;
+        if (!csvCategoryKeys.has(key)) {
+          csvCategoryKeys.set(key, []);
+        }
+        csvCategoryKeys.get(key)!.push(index + 2); // +2 because row 1 is header
+      });
+
+      const results = {
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        errors: [] as Array<{ row: number; error: string }>,
+        duplicates: [] as Array<{ row: number; name: string; reason: string }>,
+      };
+
+      // Import categories one by one
+      for (let i = 0; i < categoriesData.length; i++) {
+        const categoryData = categoriesData[i];
+        const categoryName = categoryData.name.trim();
+        const categoryNameLower = categoryName.toLowerCase();
+        const categoryType = (categoryData.type || "school").toLowerCase();
+        const categoryKey = `${categoryNameLower}_${categoryType}`;
+        const rowNumber = i + 2; // +2 because row 1 is header
+
+        // Check for duplicates within CSV (skip if not first occurrence)
+        const occurrences = csvCategoryKeys.get(categoryKey) || [];
+        if (occurrences.length > 1 && occurrences[0] !== rowNumber) {
+          results.skipped++;
+          results.duplicates.push({
+            row: rowNumber,
+            name: categoryName,
+            reason: `Duplicate name and type in CSV (first occurrence at row ${occurrences[0]})`,
+          });
+          continue;
+        }
+
+        // Check for duplicates against existing categories (name + type combination)
+        if (existingCategoryKeys.has(categoryKey)) {
+          results.skipped++;
+          results.duplicates.push({
+            row: rowNumber,
+            name: categoryName,
+            reason: `Fee category with name "${categoryName}" and type "${categoryType}" already exists in database`,
+          });
+          continue;
+        }
+
+        try {
+          const payload: any = {
+            name: categoryData.name,
+            description: categoryData.description || undefined,
+            type: categoryData.type || "school",
+            status: categoryData.status || "active",
+          };
+
+          if (
+            categoryData.applicableMonths &&
+            categoryData.applicableMonths.length > 0
+          ) {
+            payload.applicableMonths = categoryData.applicableMonths;
+          }
+
+          await api.instance.post(
+            `/super-admin/fee-categories?schoolId=${importSchoolId}`,
+            payload
+          );
+          results.success++;
+          // Add to existing set to prevent duplicates within the same import batch
+          existingCategoryKeys.add(categoryKey);
+        } catch (err: any) {
+          const errorMessage =
+            err.response?.data?.message || "Failed to create fee category";
+
+          // Check if it's a duplicate error
+          if (errorMessage.toLowerCase().includes("already exists")) {
+            results.skipped++;
+            results.duplicates.push({
+              row: rowNumber,
+              name: categoryName,
+              reason: "Fee category already exists in database",
+            });
+          } else {
+            results.failed++;
+            results.errors.push({
+              row: rowNumber,
+              error: errorMessage,
+            });
+          }
+        }
+      }
+
+      setImportResult(results);
+      if (results.success > 0) {
+        setSuccess(`Successfully imported ${results.success} fee category(es)`);
+        if (results.skipped > 0) {
+          setSuccess(
+            `Successfully imported ${results.success} fee category(es). ${results.skipped} duplicate(s) skipped.`
+          );
+        }
+        setImportFile(null);
+        setImportPreview([]);
+        loadFeeCategories();
+      }
+      if (results.failed > 0) {
+        setError(
+          `${results.failed} fee category(es) failed to import. Check errors below.`
+        );
+      }
+      if (results.skipped > 0 && results.success === 0) {
+        setError(
+          `All ${results.skipped} fee category(es) were duplicates and skipped.`
+        );
+      }
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message || "Failed to import fee categories"
+      );
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Success/Error Messages */}
@@ -391,303 +646,469 @@ export default function FeeHeading() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Side - Add/Edit Form */}
+        {/* Left Side - Add/Edit Form or Import */}
         <div className="card-modern rounded-xl p-6 lg:col-span-1">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">
-            {editingCategory ? "Edit Fee Category" : "Add Fee Category"}
-          </h2>
+          {/* Tabs */}
+          <div className="flex gap-2 mb-4 border-b border-gray-200">
+            <button
+              onClick={() => {
+                setMode("add");
+                setError("");
+                setSuccess("");
+                setImportFile(null);
+                setImportPreview([]);
+                setImportResult(null);
+              }}
+              className={`px-4 py-2 text-sm font-semibold transition-smooth ${
+                mode === "add"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Add Fee Category
+            </button>
+            <button
+              onClick={() => {
+                setMode("import");
+                setError("");
+                setSuccess("");
+                resetForm();
+              }}
+              className={`px-4 py-2 text-sm font-semibold transition-smooth ${
+                mode === "import"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Import Fee Categories
+            </button>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                School <span className="text-red-500">*</span>
-              </label>
-              {loadingSchools ? (
-                <div className="flex items-center justify-center py-4">
-                  <FiLoader className="w-5 h-5 animate-spin text-indigo-600" />
-                  <span className="ml-2 text-gray-600">Loading schools...</span>
-                </div>
-              ) : (
-                <CustomDropdown
-                  options={schools.map((school) => ({
-                    value: school.id.toString(),
-                    label: school.name,
-                  }))}
-                  value={formData.schoolId?.toString() || ""}
-                  onChange={(value) => {
-                    const numValue =
-                      typeof value === "string" ? parseInt(value, 10) : value;
-                    setFormData({ ...formData, schoolId: numValue || "" });
-                  }}
-                  placeholder="Select a school..."
-                  className="w-full"
-                />
-              )}
-            </div>
+          {mode === "add" ? (
+            <>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                {editingCategory ? "Edit Fee Category" : "Add Fee Category"}
+              </h2>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Category Name <span className="text-red-500">*</span>
-                </label>
-                {formData.schoolId && availableClasses.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCreateMode(
-                        createMode === "single" ? "multiple" : "single"
-                      )
-                    }
-                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                  >
-                    {createMode === "single"
-                      ? "Create for Multiple Classes"
-                      : "Single Mode"}
-                  </button>
-                )}
-              </div>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder={
-                  createMode === "multiple"
-                    ? "e.g., Tuition Fee (will append class names)"
-                    : "e.g., Tuition Fee, Library Fee"
-                }
-                required
-                disabled={!formData.schoolId}
-                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
-                  !formData.schoolId
-                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                    : "bg-white"
-                }`}
-              />
-              {createMode === "multiple" && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Class names will be appended automatically (e.g., "Tuition Fee
-                  - Grade 1")
-                </p>
-              )}
-              {createMode === "multiple" && (
-                <div className="mt-3 space-y-2">
-                  {loadingClasses ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    School <span className="text-red-500">*</span>
+                  </label>
+                  {loadingSchools ? (
                     <div className="flex items-center justify-center py-4">
-                      <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
-                      <span className="ml-2 text-sm text-gray-600">
-                        Loading classes...
+                      <FiLoader className="w-5 h-5 animate-spin text-indigo-600" />
+                      <span className="ml-2 text-gray-600">
+                        Loading schools...
                       </span>
                     </div>
-                  ) : availableClasses.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
-                      No classes found. Add students to this school first.
+                  ) : (
+                    <CustomDropdown
+                      options={schools.map((school) => ({
+                        value: school.id.toString(),
+                        label: school.name,
+                      }))}
+                      value={formData.schoolId?.toString() || ""}
+                      onChange={(value) => {
+                        const numValue =
+                          typeof value === "string"
+                            ? parseInt(value, 10)
+                            : value;
+                        setFormData({ ...formData, schoolId: numValue || "" });
+                      }}
+                      placeholder="Select a school..."
+                      className="w-full"
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Category Name <span className="text-red-500">*</span>
+                    </label>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="e.g., Tuition Fee, Library Fee"
+                    required
+                    disabled={!formData.schoolId}
+                    className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
+                      !formData.schoolId
+                        ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                        : "bg-white"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fee Type <span className="text-red-500">*</span>
+                  </label>
+                  <CustomDropdown
+                    options={[
+                      { value: "school", label: "School Fee" },
+                      { value: "transport", label: "Transport Fee" },
+                    ]}
+                    value={formData.type}
+                    onChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        type: value as "school" | "transport",
+                      })
+                    }
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    placeholder="Optional description..."
+                    rows={3}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth bg-white resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status <span className="text-red-500">*</span>
+                  </label>
+                  <CustomDropdown
+                    options={[
+                      { value: "active", label: "Active" },
+                      { value: "inactive", label: "Inactive" },
+                    ]}
+                    value={formData.status}
+                    onChange={(value) =>
+                      setFormData({ ...formData, status: String(value) })
+                    }
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Applicable Months
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Select months when this fee is applicable. Leave empty for
+                    all months.
+                  </p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
+                    {[
+                      { num: 1, name: "Jan" },
+                      { num: 2, name: "Feb" },
+                      { num: 3, name: "Mar" },
+                      { num: 4, name: "Apr" },
+                      { num: 5, name: "May" },
+                      { num: 6, name: "Jun" },
+                      { num: 7, name: "Jul" },
+                      { num: 8, name: "Aug" },
+                      { num: 9, name: "Sep" },
+                      { num: 10, name: "Oct" },
+                      { num: 11, name: "Nov" },
+                      { num: 12, name: "Dec" },
+                    ].map((month) => {
+                      const isSelected = formData.applicableMonths.includes(
+                        month.num
+                      );
+                      return (
+                        <button
+                          key={month.num}
+                          type="button"
+                          onClick={() => {
+                            const newMonths = isSelected
+                              ? formData.applicableMonths.filter(
+                                  (m) => m !== month.num
+                                )
+                              : [...formData.applicableMonths, month.num].sort(
+                                  (a, b) => a - b
+                                );
+                            setFormData({
+                              ...formData,
+                              applicableMonths: newMonths,
+                            });
+                          }}
+                          className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${
+                            isSelected
+                              ? "bg-indigo-600 text-white shadow-md"
+                              : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
+                          }`}
+                        >
+                          {month.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {formData.applicableMonths.length > 0 && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-600">Selected:</span>
+                      <span className="text-xs font-medium text-indigo-600">
+                        {formData.applicableMonths
+                          .map((m) => {
+                            const monthNames = [
+                              "Jan",
+                              "Feb",
+                              "Mar",
+                              "Apr",
+                              "May",
+                              "Jun",
+                              "Jul",
+                              "Aug",
+                              "Sep",
+                              "Oct",
+                              "Nov",
+                              "Dec",
+                            ];
+                            return monthNames[m - 1];
+                          })
+                          .join(", ")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, applicableMonths: [] })
+                        }
+                        className="text-xs text-red-600 hover:text-red-800 underline"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+                  >
+                    {editingCategory ? "Update" : "Create"}
+                  </button>
+                  {editingCategory && (
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="px-4 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-smooth"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                Import Fee Categories from CSV
+              </h2>
+
+              <div className="space-y-4">
+                {/* School Selection for Import */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    School <span className="text-red-500">*</span>
+                  </label>
+                  {loadingSchools ? (
+                    <div className="flex items-center justify-center py-2">
+                      <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                      <span className="ml-2 text-sm text-gray-600">
+                        Loading...
+                      </span>
                     </div>
                   ) : (
-                    <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-2 bg-white">
-                      {availableClasses.map((className) => (
-                        <label
-                          key={className}
-                          className="flex items-center px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedClasses.includes(className)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedClasses([
-                                  ...selectedClasses,
-                                  className,
-                                ]);
-                              } else {
-                                setSelectedClasses(
-                                  selectedClasses.filter((c) => c !== className)
-                                );
-                              }
-                            }}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="ml-2 text-sm text-gray-700">
-                            {className}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {selectedClasses.length > 0 && (
-                    <div className="text-xs text-gray-600">
-                      {selectedClasses.length} class(es) selected - Will create:{" "}
-                      {selectedClasses
-                        .map((c) => `"${formData.name || "Fee"} - ${c}"`)
-                        .join(", ")}
-                    </div>
+                    <CustomDropdown
+                      options={schools.map((school) => ({
+                        value: school.id.toString(),
+                        label: school.name,
+                      }))}
+                      value={importSchoolId?.toString() || ""}
+                      onChange={(value) => {
+                        const schoolId = value ? parseInt(value as string) : "";
+                        setImportSchoolId(schoolId);
+                        setImportFile(null);
+                        setImportPreview([]);
+                        setImportResult(null);
+                      }}
+                      placeholder="Select a school..."
+                      className="w-full"
+                    />
                   )}
                 </div>
-              )}
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fee Type <span className="text-red-500">*</span>
-              </label>
-              <CustomDropdown
-                options={[
-                  { value: "school", label: "School Fee" },
-                  { value: "transport", label: "Transport Fee" },
-                ]}
-                value={formData.type}
-                onChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    type: value as "school" | "transport",
-                  })
-                }
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Optional description..."
-                rows={3}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth bg-white resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status <span className="text-red-500">*</span>
-              </label>
-              <CustomDropdown
-                options={[
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                ]}
-                value={formData.status}
-                onChange={(value) =>
-                  setFormData({ ...formData, status: String(value) })
-                }
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Applicable Months
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Select months when this fee is applicable. Leave empty for all
-                months.
-              </p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
-                {[
-                  { num: 1, name: "Jan" },
-                  { num: 2, name: "Feb" },
-                  { num: 3, name: "Mar" },
-                  { num: 4, name: "Apr" },
-                  { num: 5, name: "May" },
-                  { num: 6, name: "Jun" },
-                  { num: 7, name: "Jul" },
-                  { num: 8, name: "Aug" },
-                  { num: 9, name: "Sep" },
-                  { num: 10, name: "Oct" },
-                  { num: 11, name: "Nov" },
-                  { num: 12, name: "Dec" },
-                ].map((month) => {
-                  const isSelected = formData.applicableMonths.includes(
-                    month.num
-                  );
-                  return (
+                {/* Download Sample CSV */}
+                {importSchoolId && (
+                  <div>
                     <button
-                      key={month.num}
                       type="button"
-                      onClick={() => {
-                        const newMonths = isSelected
-                          ? formData.applicableMonths.filter(
-                              (m) => m !== month.num
-                            )
-                          : [...formData.applicableMonths, month.num].sort(
-                              (a, b) => a - b
-                            );
-                        setFormData({
-                          ...formData,
-                          applicableMonths: newMonths,
-                        });
-                      }}
-                      className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${
-                        isSelected
-                          ? "bg-indigo-600 text-white shadow-md"
-                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
+                      onClick={downloadSampleCSV}
+                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition-smooth flex items-center justify-center gap-2"
+                    >
+                      <FiDownload className="w-4 h-4" />
+                      Download Sample CSV
+                    </button>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Download a sample CSV with school ID pre-filled
+                    </p>
+                  </div>
+                )}
+
+                {/* File Upload */}
+                {importSchoolId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload CSV File <span className="text-red-500">*</span>
+                    </label>
+                    <div
+                      {...getRootProps()}
+                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-smooth ${
+                        isDragActive
+                          ? "border-indigo-500 bg-indigo-50"
+                          : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
                       }`}
                     >
-                      {month.name}
-                    </button>
-                  );
-                })}
-              </div>
-              {formData.applicableMonths.length > 0 && (
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-gray-600">Selected:</span>
-                  <span className="text-xs font-medium text-indigo-600">
-                    {formData.applicableMonths
-                      .map((m) => {
-                        const monthNames = [
-                          "Jan",
-                          "Feb",
-                          "Mar",
-                          "Apr",
-                          "May",
-                          "Jun",
-                          "Jul",
-                          "Aug",
-                          "Sep",
-                          "Oct",
-                          "Nov",
-                          "Dec",
-                        ];
-                        return monthNames[m - 1];
-                      })
-                      .join(", ")}
-                  </span>
+                      <input {...getInputProps()} />
+                      <FiUpload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                      {importFile ? (
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">
+                            {importFile.name}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setImportFile(null);
+                              setImportPreview([]);
+                            }}
+                            className="mt-2 text-xs text-red-600 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-gray-600">
+                            {isDragActive
+                              ? "Drop your CSV file here"
+                              : "Drag & drop your CSV file here"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            or click to browse
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview */}
+                {importPreview.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Preview ({importPreview.length} rows)
+                    </label>
+                    <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-2 py-1 text-left">Name</th>
+                            <th className="px-2 py-1 text-left">Type</th>
+                            <th className="px-2 py-1 text-left">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreview.map((row, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-2 py-1">{row.name}</td>
+                              <td className="px-2 py-1">{row.type}</td>
+                              <td className="px-2 py-1">{row.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Import Button */}
+                {importFile && importSchoolId && (
                   <button
                     type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, applicableMonths: [] })
-                    }
-                    className="text-xs text-red-600 hover:text-red-800 underline"
+                    onClick={handleBulkImport}
+                    disabled={isImporting}
+                    className={`w-full px-3 py-2 rounded-lg text-sm font-semibold shadow transition-all ${
+                      isImporting
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
+                    }`}
                   >
-                    Clear
+                    {isImporting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <FiLoader className="w-4 h-4 animate-spin" />
+                        Importing...
+                      </span>
+                    ) : (
+                      "Import Fee Categories"
+                    )}
                   </button>
-                </div>
-              )}
-            </div>
+                )}
 
-            <div className="flex gap-3 pt-2">
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
-              >
-                {editingCategory ? "Update" : "Create"}
-              </button>
-              {editingCategory && (
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-4 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-smooth"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
+                {/* Import Results */}
+                {importResult && (
+                  <div className="space-y-2">
+                    {importResult.success > 0 && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm font-semibold text-green-800">
+                          Successfully imported: {importResult.success} fee
+                          category(es)
+                        </p>
+                      </div>
+                    )}
+                    {importResult.skipped > 0 && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm font-semibold text-yellow-800 mb-2">
+                          Skipped (duplicates): {importResult.skipped} fee
+                          category(es)
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-xs text-yellow-700">
+                          {importResult.duplicates.map((dup, idx) => (
+                            <div key={idx} className="mb-1">
+                              Row {dup.row} - "{dup.name}": {dup.reason}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {importResult.failed > 0 && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm font-semibold text-red-800 mb-2">
+                          Failed: {importResult.failed} fee category(es)
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-xs text-red-700">
+                          {importResult.errors.map((err, idx) => (
+                            <div key={idx} className="mb-1">
+                              Row {err.row}: {err.error}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right Side - List */}
