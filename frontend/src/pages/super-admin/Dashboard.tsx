@@ -10,6 +10,14 @@ import {
   FiLoader,
 } from 'react-icons/fi';
 import api from '../../services/api';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface DashboardStats {
   totalSchools: number;
@@ -55,27 +63,29 @@ export default function SuperAdminDashboard() {
     link: string;
   }) => {
     const content = (
-      <div className="card-modern rounded-2xl shadow-lg hover:shadow-xl transition-smooth hover-lift p-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-            <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-              {loading ? (
-                <FiLoader className="w-6 h-6 animate-spin text-gray-400" />
-              ) : (
-                typeof value === 'number' ? value.toLocaleString() : value
-              )}
-            </p>
+      <Card className="hover:shadow-lg transition-shadow">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+              <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+                {loading ? (
+                  <FiLoader className="w-6 h-6 animate-spin text-gray-400" />
+                ) : (
+                  typeof value === 'number' ? value.toLocaleString() : value
+                )}
+              </p>
+            </div>
+            <div className={`${color} p-4 rounded-xl shadow-lg`}>
+              <Icon className="w-8 h-8 text-white" />
+            </div>
           </div>
-          <div className={`${color} p-4 rounded-xl shadow-lg`}>
-            <Icon className="w-8 h-8 text-white" />
+          <div className="mt-4 flex items-center text-sm text-gray-500">
+            <FiTrendingUp className="w-4 h-4 mr-1" />
+            <span>View all</span>
           </div>
-        </div>
-        <div className="mt-4 flex items-center text-sm text-gray-500">
-          <FiTrendingUp className="w-4 h-4 mr-1" />
-          <span>View all</span>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
 
     return link ? (
@@ -90,19 +100,25 @@ export default function SuperAdminDashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="card-modern rounded-2xl shadow-xl p-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white animate-fade-in">
-        <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name}! 👋</h1>
-        <p className="text-indigo-100">Super Admin Dashboard</p>
-      </div>
+      <Card className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-white">
+            Welcome back, {user?.name}! 👋
+          </CardTitle>
+          <CardDescription className="text-indigo-100">
+            Super Admin Dashboard
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Stats Grid */}
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900">Overview</h2>
-          <button
+          <Button
             onClick={loadStats}
             disabled={loading}
-            className="text-sm bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-xl font-medium disabled:opacity-50 flex items-center shadow-md hover:shadow-lg transition-smooth hover-lift"
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
           >
             {loading ? (
               <>
@@ -112,7 +128,7 @@ export default function SuperAdminDashboard() {
             ) : (
               'Refresh'
             )}
-          </button>
+          </Button>
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
@@ -148,26 +164,32 @@ export default function SuperAdminDashboard() {
 
       {/* Recent Schools */}
       {stats?.recentSchools && stats.recentSchools.length > 0 && (
-        <div className="card-modern rounded-2xl shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Schools</h2>
-          <div className="space-y-3">
-            {stats.recentSchools.map((school) => (
-              <Link
-                key={school.id}
-                to={`/super-admin/schools/${school.id}/details`}
-                className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-200 hover:bg-indigo-50/50 hover:border-indigo-200 transition-smooth"
-              >
-                <div>
-                  <p className="font-semibold text-gray-800">{school.name}</p>
-                  <p className="text-sm text-gray-600">{school.subdomain}</p>
-                </div>
-                <div className="text-sm text-gray-500">
-                  {new Date(school.createdAt).toLocaleDateString()}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-gray-900">
+              Recent Schools
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats.recentSchools.map((school) => (
+                <Link
+                  key={school.id}
+                  to={`/super-admin/schools/${school.id}/details`}
+                  className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-200 hover:bg-indigo-50/50 hover:border-indigo-200 transition-smooth"
+                >
+                  <div>
+                    <p className="font-semibold text-gray-800">{school.name}</p>
+                    <p className="text-sm text-gray-600">{school.subdomain}</p>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {new Date(school.createdAt).toLocaleDateString()}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

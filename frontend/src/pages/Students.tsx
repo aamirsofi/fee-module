@@ -131,7 +131,7 @@ export default function Students() {
     <Layout>
       <div className="space-y-6">
         {/* Header - Using shadcn/ui Card */}
-        <Card className="card-modern rounded-2xl shadow-lg animate-fade-in">
+        <Card className="shadow-lg">
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
@@ -215,7 +215,7 @@ export default function Students() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="card-modern rounded-2xl shadow-lg overflow-hidden animate-fade-in">
+          <Card className="shadow-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50">

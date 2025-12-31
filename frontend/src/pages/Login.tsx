@@ -55,7 +55,7 @@ export default function Login() {
         </div>
 
         {/* Login Form - Using shadcn/ui Card */}
-        <Card className="card-modern rounded-2xl shadow-xl animate-fade-in">
+        <Card className="rounded-2xl shadow-xl">
           <CardHeader>
             <CardTitle className="text-2xl">Sign in to your account</CardTitle>
             <CardDescription>

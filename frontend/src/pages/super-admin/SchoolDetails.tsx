@@ -17,6 +17,22 @@ import {
 } from "react-icons/fi";
 import api from "../../services/api";
 import StudentBulkImport from "../../components/StudentBulkImport";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SchoolDetails {
   school: {
@@ -175,16 +191,18 @@ export default function SchoolDetails() {
   if (error || !data) {
     return (
       <div className="space-y-6">
-        <div className="card-modern rounded-2xl p-6 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{error || "School not found"}</p>
-          <Link
-            to="/super-admin/schools"
-            className="mt-4 inline-flex items-center text-indigo-600 hover:text-indigo-700"
-          >
-            <FiArrowLeft className="w-4 h-4 mr-2" />
-            Back to Schools
-          </Link>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-red-700 mb-4">{error || "School not found"}</p>
+            <Link
+              to="/super-admin/schools"
+              className="inline-flex items-center text-indigo-600 hover:text-indigo-700"
+            >
+              <FiArrowLeft className="w-4 h-4 mr-2" />
+              Back to Schools
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -194,128 +212,143 @@ export default function SchoolDetails() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/super-admin/schools"
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-smooth"
-          >
-            <FiArrowLeft className="w-4 h-4 text-gray-600" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-              {school.name}
-            </h1>
-            <p className="text-gray-600 text-sm mt-0.5">
-              School Details & Analytics
-            </p>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link
+                to="/super-admin/schools"
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-smooth"
+              >
+                <FiArrowLeft className="w-4 h-4 text-gray-600" />
+              </Link>
+              <div>
+                <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+                  {school.name}
+                </CardTitle>
+                <CardDescription>School Details & Analytics</CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEdit}
+                title="Edit school"
+              >
+                <FiEdit className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={refreshing || loading}
+                title="Refresh data"
+              >
+                <FiRefreshCw
+                  className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
+                />
+              </Button>
+              <Badge
+                className={
+                  school.status === "active"
+                    ? "bg-green-100 text-green-800"
+                    : school.status === "suspended"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-gray-100 text-gray-800"
+                }
+              >
+                {school.status.charAt(0).toUpperCase() + school.status.slice(1)}
+              </Badge>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleEdit}
-            className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-smooth"
-            title="Edit school"
-          >
-            <FiEdit className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing || loading}
-            className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-smooth disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Refresh data"
-          >
-            <FiRefreshCw
-              className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
-            />
-          </button>
-          <span
-            className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-              school.status === "active"
-                ? "bg-green-100 text-green-800"
-                : school.status === "suspended"
-                ? "bg-red-100 text-red-800"
-                : "bg-gray-100 text-gray-800"
-            }`}
-          >
-            {school.status.charAt(0).toUpperCase() + school.status.slice(1)}
-          </span>
-        </div>
-      </div>
+        </CardHeader>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="card-modern rounded-2xl p-6 hover-lift">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Students</p>
-              <p className="text-3xl font-bold text-indigo-600">
-                {stats.totalStudents}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.activeStudents} active
-              </p>
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Students</p>
+                <p className="text-3xl font-bold text-indigo-600">
+                  {stats.totalStudents}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.activeStudents} active
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <FiUsers className="w-6 h-6 text-indigo-600" />
+              </div>
             </div>
-            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <FiUsers className="w-6 h-6 text-indigo-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="card-modern rounded-2xl p-6 hover-lift">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Users</p>
-              <p className="text-3xl font-bold text-purple-600">
-                {stats.totalUsers}
-              </p>
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Users</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {stats.totalUsers}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <FiUsers className="w-6 h-6 text-purple-600" />
+              </div>
             </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-              <FiUsers className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="card-modern rounded-2xl p-6 hover-lift">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-              <p className="text-3xl font-bold text-green-600">
-                ${stats.totalRevenue.toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.completedPayments} completed payments
-              </p>
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+                <p className="text-3xl font-bold text-green-600">
+                  ${stats.totalRevenue.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.completedPayments} completed payments
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <FiDollarSign className="w-6 h-6 text-green-600" />
+              </div>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-              <FiDollarSign className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="card-modern rounded-2xl p-6 hover-lift">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Fee Structures</p>
-              <p className="text-3xl font-bold text-pink-600">
-                {stats.totalFeeStructures}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.activeFeeStructures} active
-              </p>
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Fee Structures</p>
+                <p className="text-3xl font-bold text-pink-600">
+                  {stats.totalFeeStructures}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.activeFeeStructures} active
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center">
+                <FiBook className="w-6 h-6 text-pink-600" />
+              </div>
             </div>
-            <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center">
-              <FiBook className="w-6 h-6 text-pink-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* School Information */}
-      <div className="card-modern rounded-2xl p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">
-          School Information
-        </h2>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold text-gray-800">
+            School Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <p className="text-sm text-gray-600 mb-1">Subdomain</p>
@@ -375,39 +408,47 @@ export default function SchoolDetails() {
             </div>
           )}
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Success/Error Messages */}
       {importSuccess && (
-        <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
-          <p className="text-green-700">{importSuccess}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="pt-6">
+            <p className="text-green-700">{importSuccess}</p>
+          </CardContent>
+        </Card>
       )}
       {importError && (
-        <div className="card-modern rounded-xl p-4 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{importError}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-red-700">{importError}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Students Section */}
-      <div className="card-modern rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-800">
-            Students ({students.length})
-          </h2>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">
-              Showing {students.length} of {stats.totalStudents}
-            </span>
-            <button
-              onClick={() => setShowBulkImport(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
-            >
-              <FiUpload className="w-4 h-4" />
-              Bulk Import
-            </button>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl font-bold text-gray-800">
+              Students ({students.length})
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500">
+                Showing {students.length} of {stats.totalStudents}
+              </span>
+              <Button
+                onClick={() => setShowBulkImport(true)}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+              >
+                <FiUpload className="w-4 h-4 mr-2" />
+                Bulk Import
+              </Button>
+            </div>
           </div>
-        </div>
+        </CardHeader>
+        <CardContent>
         {students.length === 0 ? (
           <p className="text-gray-500 text-center py-8">No students found</p>
         ) : (
@@ -446,17 +487,17 @@ export default function SchoolDetails() {
                       {student.section && ` - ${student.section}`}
                     </td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full border ${
+                      <Badge
+                        className={
                           student.status === "active"
                             ? "bg-green-100 text-green-700 border-green-200"
                             : student.status === "graduated"
                             ? "bg-blue-100 text-blue-700 border-blue-200"
                             : "bg-gray-100 text-gray-700 border-gray-200"
-                        }`}
+                        }
                       >
                         {student.status}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -464,15 +505,17 @@ export default function SchoolDetails() {
             </table>
           </div>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Users Section */}
-      <div className="card-modern rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-800">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold text-gray-800">
             Users ({users.length})
-          </h2>
-        </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
         {users.length === 0 ? (
           <p className="text-gray-500 text-center py-8">No users found</p>
         ) : (
@@ -507,9 +550,9 @@ export default function SchoolDetails() {
                       {user.email}
                     </td>
                     <td className="px-4 py-2">
-                      <span className="inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 capitalize">
+                      <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">
                         {user.role.replace("_", " ")}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-600">
                       {new Date(user.createdAt).toLocaleDateString()}
@@ -520,18 +563,22 @@ export default function SchoolDetails() {
             </table>
           </div>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Payments Section */}
-      <div className="card-modern rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-800">
-            Recent Payments ({payments.length})
-          </h2>
-          <span className="text-sm text-gray-500">
-            Showing {payments.length} of {stats.totalPayments}
-          </span>
-        </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl font-bold text-gray-800">
+              Recent Payments ({payments.length})
+            </CardTitle>
+            <span className="text-sm text-gray-500">
+              Showing {payments.length} of {stats.totalPayments}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent>
         {payments.length === 0 ? (
           <p className="text-gray-500 text-center py-8">No payments found</p>
         ) : (
@@ -584,8 +631,8 @@ export default function SchoolDetails() {
                       {payment.paymentMethod.replace("_", " ")}
                     </td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full border ${
+                      <Badge
+                        className={
                           payment.status === "completed"
                             ? "bg-green-100 text-green-700 border-green-200"
                             : payment.status === "pending"
@@ -593,10 +640,10 @@ export default function SchoolDetails() {
                             : payment.status === "failed"
                             ? "bg-red-100 text-red-700 border-red-200"
                             : "bg-gray-100 text-gray-700 border-gray-200"
-                        }`}
+                        }
                       >
                         {payment.status}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-600">
                       {new Date(payment.paymentDate).toLocaleDateString()}
@@ -607,15 +654,17 @@ export default function SchoolDetails() {
             </table>
           </div>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Fee Structures Section */}
-      <div className="card-modern rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-800">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold text-gray-800">
             Fee Structures ({feeStructures.length})
-          </h2>
-        </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
         {feeStructures.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
             No fee structures found
@@ -669,15 +718,15 @@ export default function SchoolDetails() {
                       {fs.class || "All"}
                     </td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full border ${
+                      <Badge
+                        className={
                           fs.status === "active"
                             ? "bg-green-100 text-green-700 border-green-200"
                             : "bg-gray-100 text-gray-700 border-gray-200"
-                        }`}
+                        }
                       >
                         {fs.status}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -685,40 +734,25 @@ export default function SchoolDetails() {
             </table>
           </div>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Bulk Import Modal */}
-      {showBulkImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="card-modern rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold mb-2 text-gray-800">
-                  Bulk Import Students
-                </h2>
-                <p className="text-sm text-gray-600">
-                  Upload a CSV file to import multiple students at once
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowBulkImport(false);
-                  setImportError("");
-                  setImportSuccess("");
-                }}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-smooth"
-              >
-                <FiX className="w-6 h-6" />
-              </button>
-            </div>
-            <StudentBulkImport
-              schoolId={school.id}
-              onImportSuccess={handleImportSuccess}
-              onImportError={handleImportError}
-            />
-          </div>
-        </div>
-      )}
+      <Dialog open={showBulkImport} onOpenChange={setShowBulkImport}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Import Students</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to import multiple students at once
+            </DialogDescription>
+          </DialogHeader>
+          <StudentBulkImport
+            schoolId={school.id}
+            onImportSuccess={handleImportSuccess}
+            onImportError={handleImportError}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

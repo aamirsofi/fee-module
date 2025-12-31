@@ -154,7 +154,7 @@ export default function Profile() {
   return (
     <div className="space-y-4">
       {/* Header - Using shadcn/ui Card */}
-      <Card className="card-modern rounded-xl">
+      <Card>
         <CardHeader>
           <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
             My Profile
@@ -185,7 +185,7 @@ export default function Profile() {
       )}
 
       {/* Tabs - Using shadcn/ui Tabs with custom styling */}
-      <Card className="card-modern rounded-xl">
+      <Card>
         <CardContent className="p-4">
           <Tabs
             value={activeTab}
