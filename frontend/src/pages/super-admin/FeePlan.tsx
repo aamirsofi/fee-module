@@ -3,6 +3,14 @@ import { FiLoader, FiDownload, FiUpload } from "react-icons/fi";
 // useDropzone is now in useFeePlanImport hook
 import api from "../../services/api";
 import { FeeStructure } from "../../types";
+import {
+  validateSingleModeForm,
+  validateMultipleModeForm,
+  validateEditForm,
+  generateCombinations,
+  filterDuplicates,
+  generatePlanNameFromIds,
+} from "../../utils/feePlan";
 import { useFeePlanData } from "../../hooks/pages/super-admin/useFeePlanData";
 import { useFeePlanImport } from "../../hooks/pages/super-admin/useFeePlanImport";
 import { useFeePlanSelection } from "../../hooks/pages/super-admin/useFeePlanSelection";
@@ -138,51 +146,32 @@ export default function FeePlan() {
       setError("");
       setSuccess("");
 
-      // Convert to number if string, then validate
+      // Validate form using utility functions
+      let validation;
+      if (editingStructure) {
+        validation = validateEditForm(formData);
+      } else if (createMode === "multiple") {
+        validation = validateMultipleModeForm(
+          formData,
+          selectedFeeCategoryIds,
+          selectedClasses
+        );
+      } else {
+        validation = validateSingleModeForm(formData);
+      }
+
+      if (!validation.isValid) {
+        setError(validation.error || "Validation failed");
+        return;
+      }
+
+      // Convert schoolId to number
       const schoolIdNum =
         typeof formData.schoolId === "string"
           ? parseInt(formData.schoolId, 10)
           : formData.schoolId;
-      if (!schoolIdNum || schoolIdNum === 0 || isNaN(schoolIdNum)) {
-        setError("Please select a school");
-        return;
-      }
 
-      if (!formData.amount || parseFloat(formData.amount) <= 0) {
-        setError("Please enter a valid amount");
-        return;
-      }
-
-      // Validate based on mode
-      if (createMode === "multiple") {
-        if (selectedFeeCategoryIds.length === 0) {
-          setError("Please select at least one fee heading");
-          return;
-        }
-        if (selectedClasses.length === 0) {
-          setError("Please select at least one class");
-          return;
-        }
-      } else {
-        const feeCategoryIdNum =
-          typeof formData.feeCategoryId === "string"
-            ? parseInt(formData.feeCategoryId, 10)
-            : formData.feeCategoryId;
-        if (
-          !feeCategoryIdNum ||
-          feeCategoryIdNum === 0 ||
-          isNaN(feeCategoryIdNum)
-        ) {
-          setError("Please select a fee heading");
-          return;
-        }
-        if (!formData.classId) {
-          setError("Please select a class");
-          return;
-        }
-      }
-
-      const currentSchoolId = formData.schoolId;
+      const currentSchoolId = schoolIdNum;
 
       if (editingStructure) {
         // Single edit mode
@@ -191,27 +180,22 @@ export default function FeePlan() {
           return;
         }
 
-        const selectedCategory = feeCategories.find(
-          (cat) => cat.id === parseInt(formData.feeCategoryId as string)
-        );
-        const selectedCategoryHead = categoryHeads.find(
-          (ch) => ch.id === parseInt(formData.categoryHeadId as string)
-        );
         const classIdNum =
           typeof formData.classId === "number"
             ? formData.classId
             : parseInt(formData.classId as string);
-        const selectedClass = classOptions.find((cls) => cls.id === classIdNum);
 
-        const basePlanName = selectedCategory
-          ? `${selectedCategory.name}${
-              selectedCategoryHead ? ` - ${selectedCategoryHead.name}` : ""
-            }`
-          : "Fee Plan";
-
-        const planName = `${basePlanName}${
-          selectedClass ? ` (${selectedClass.name})` : ""
-        }`;
+        // Generate plan name using utility function
+        const planName = generatePlanNameFromIds(
+          parseInt(formData.feeCategoryId as string),
+          formData.categoryHeadId
+            ? parseInt(formData.categoryHeadId as string)
+            : null,
+          classIdNum,
+          feeCategories,
+          categoryHeads,
+          classOptions
+        );
 
         const payload: any = {
           name: planName,
@@ -224,8 +208,8 @@ export default function FeePlan() {
           payload.categoryHeadId = parseInt(formData.categoryHeadId as string);
         }
 
-        if (selectedClass?.id) {
-          payload.classId = selectedClass.id;
+        if (classIdNum) {
+          payload.classId = classIdNum;
         }
 
         await api.instance.patch(
@@ -238,30 +222,12 @@ export default function FeePlan() {
       } else {
         // Create mode
         if (createMode === "multiple") {
-          // Generate all combinations
-          const combinations: Array<{
-            feeCategoryId: number;
-            categoryHeadId: number | null;
-            classId: number;
-          }> = [];
-
-          // If no category heads selected, include null (General)
-          const categoryHeadIdsToUse =
-            selectedCategoryHeadIds.length > 0
-              ? selectedCategoryHeadIds
-              : [null];
-
-          selectedFeeCategoryIds.forEach((feeCategoryId) => {
-            categoryHeadIdsToUse.forEach((categoryHeadId) => {
-              selectedClasses.forEach((classId) => {
-                combinations.push({
-                  feeCategoryId,
-                  categoryHeadId,
-                  classId,
-                });
-              });
-            });
-          });
+          // Generate all combinations using utility function
+          const combinations = generateCombinations(
+            selectedFeeCategoryIds,
+            selectedCategoryHeadIds,
+            selectedClasses
+          );
 
           // Check for existing fee structures to avoid duplicates
           const existingStructuresResponse = await api.instance.get(
@@ -283,22 +249,11 @@ export default function FeePlan() {
             ? existingStructuresResponse.data
             : [];
 
-          // Filter out duplicates
-          const newCombinations = combinations.filter((combo) => {
-            return !existingStructures.some((existing: any) => {
-              const matchesFeeCategory =
-                existing.feeCategoryId === combo.feeCategoryId;
-              const matchesCategoryHead =
-                existing.categoryHeadId === combo.categoryHeadId ||
-                (!existing.categoryHeadId && !combo.categoryHeadId);
-              // Compare classId directly
-              const matchesClass =
-                existing.classId === combo.classId ||
-                (!existing.classId && !combo.classId);
-
-              return matchesFeeCategory && matchesCategoryHead && matchesClass;
-            });
-          });
+          // Filter out duplicates using utility function
+          const newCombinations = filterDuplicates(
+            combinations,
+            existingStructures
+          );
 
           const duplicateCount = combinations.length - newCombinations.length;
 
@@ -317,19 +272,15 @@ export default function FeePlan() {
 
           for (const combo of newCombinations) {
             try {
-              const feeCategory = feeCategories.find(
-                (cat) => cat.id === combo.feeCategoryId
+              // Generate plan name using utility function
+              const planName = generatePlanNameFromIds(
+                combo.feeCategoryId,
+                combo.categoryHeadId,
+                combo.classId,
+                feeCategories,
+                categoryHeads,
+                classOptions
               );
-              const categoryHead = combo.categoryHeadId
-                ? categoryHeads.find((ch) => ch.id === combo.categoryHeadId)
-                : null;
-              const selectedClass = classOptions.find(
-                (cls) => cls.id === combo.classId
-              );
-
-              const planName = `${feeCategory?.name || "Fee Plan"}${
-                categoryHead ? ` - ${categoryHead.name}` : ""
-              }${selectedClass ? ` (${selectedClass.name})` : ""}`;
 
               const payload: any = {
                 name: planName,
@@ -353,18 +304,15 @@ export default function FeePlan() {
               successCount++;
             } catch (err: any) {
               failedCount++;
-              const feeCategory = feeCategories.find(
-                (cat) => cat.id === combo.feeCategoryId
+              // Generate plan name using utility function
+              const planName = generatePlanNameFromIds(
+                combo.feeCategoryId,
+                combo.categoryHeadId,
+                combo.classId,
+                feeCategories,
+                categoryHeads,
+                classOptions
               );
-              const categoryHead = combo.categoryHeadId
-                ? categoryHeads.find((ch) => ch.id === combo.categoryHeadId)
-                : null;
-              const selectedClass = classOptions.find(
-                (cls) => cls.id === combo.classId
-              );
-              const planName = `${feeCategory?.name || "Fee Plan"}${
-                categoryHead ? ` - ${categoryHead.name}` : ""
-              }${selectedClass ? ` (${selectedClass.name})` : ""}`;
 
               // Check if it's a duplicate error (400) or other error
               if (err.response?.status === 400) {
@@ -401,29 +349,22 @@ export default function FeePlan() {
           setSelectedClasses([]);
         } else {
           // Single create mode
-          const selectedCategory = feeCategories.find(
-            (cat) => cat.id === parseInt(formData.feeCategoryId as string)
-          );
-          const selectedCategoryHead = categoryHeads.find(
-            (ch) => ch.id === parseInt(formData.categoryHeadId as string)
-          );
           const classIdNum =
             typeof formData.classId === "number"
               ? formData.classId
               : parseInt(formData.classId as string);
-          const selectedClass = classOptions.find(
-            (cls) => cls.id === classIdNum
+
+          // Generate plan name using utility function
+          const planName = generatePlanNameFromIds(
+            parseInt(formData.feeCategoryId as string),
+            formData.categoryHeadId
+              ? parseInt(formData.categoryHeadId as string)
+              : null,
+            classIdNum,
+            feeCategories,
+            categoryHeads,
+            classOptions
           );
-
-          const basePlanName = selectedCategory
-            ? `${selectedCategory.name}${
-                selectedCategoryHead ? ` - ${selectedCategoryHead.name}` : ""
-              }`
-            : "Fee Plan";
-
-          const planName = `${basePlanName}${
-            selectedClass ? ` (${selectedClass.name})` : ""
-          }`;
 
           const payload: any = {
             name: planName,
@@ -438,8 +379,8 @@ export default function FeePlan() {
             );
           }
 
-          if (selectedClass?.id) {
-            payload.classId = selectedClass.id;
+          if (classIdNum) {
+            payload.classId = classIdNum;
           }
 
           await api.instance.post(

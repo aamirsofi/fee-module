@@ -2,6 +2,18 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import api from "../../../services/api";
 import { FeeStructure } from "../../../types";
+import {
+  readAndParseCSV,
+  generateSampleCSV,
+  downloadCSV,
+  createLookupMaps,
+  type ParsedFeePlan,
+} from "../../../utils/feePlan";
+import {
+  filterDuplicates,
+  findDuplicate,
+  type FeePlanIdentifier,
+} from "../../../utils/feePlan/duplicateUtils";
 
 interface ImportResult {
   success: number;
@@ -89,197 +101,19 @@ export function useFeePlanImport({
       const classesData =
         classesResponse.data.data || classesResponse.data || [];
 
-      // Create lookup maps
-      const feeCategoryMap = new Map<string, number>();
-      feeCategoriesData.forEach((cat: { name: string; id: number }) => {
-        feeCategoryMap.set(cat.name.toLowerCase().trim(), cat.id);
-      });
+      // Create lookup maps using utility function
+      const { feeCategoryMap, categoryHeadMap, classMap } = createLookupMaps(
+        feeCategoriesData,
+        categoryHeadsData,
+        classesData
+      );
 
-      const categoryHeadMap = new Map<string, number>();
-      categoryHeadsData.forEach((ch: { name: string; id: number }) => {
-        categoryHeadMap.set(ch.name.toLowerCase().trim(), ch.id);
-      });
-
-      const classMap = new Map<string, number>();
-      classesData.forEach((cls: { name: string; id: number }) => {
-        classMap.set(cls.name.toLowerCase().trim(), cls.id);
-      });
-
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const text = e.target?.result as string;
-            const lines = text.split("\n").filter((line) => line.trim());
-
-            if (lines.length < 2) {
-              reject(
-                new Error(
-                  "CSV file must have at least a header row and one data row"
-                )
-              );
-              return;
-            }
-
-            const headers = lines[0]
-              .split(",")
-              .map((h) => h.trim().replace(/"/g, "").toLowerCase());
-            const data: ParsedFeePlan[] = [];
-            const errors: string[] = [];
-
-            for (let i = 1; i < lines.length; i++) {
-              const values = lines[i]
-                .split(",")
-                .map((v) => v.trim().replace(/"/g, ""));
-              const row: Record<string, string> = {};
-
-              headers.forEach((header, index) => {
-                row[header] = values[index] || "";
-              });
-
-              const rowNumber = i + 1;
-
-              // Resolve fee category name to ID
-              const feeCategoryName =
-                row.feecategoryname ||
-                row.feecategoryname ||
-                row.feecategoryid ||
-                row.feecategoryid ||
-                "";
-              let feeCategoryId: number | null = null;
-
-              if (feeCategoryName) {
-                // Try as ID first
-                const idMatch = parseInt(feeCategoryName);
-                if (!isNaN(idMatch)) {
-                  feeCategoryId = idMatch;
-                } else {
-                  // Try as name
-                  feeCategoryId =
-                    feeCategoryMap.get(feeCategoryName.toLowerCase().trim()) ||
-                    null;
-                  if (!feeCategoryId) {
-                    errors.push(
-                      `Row ${rowNumber}: Fee category "${feeCategoryName}" not found for this school`
-                    );
-                    continue;
-                  }
-                }
-              } else {
-                errors.push(`Row ${rowNumber}: Fee category is required`);
-                continue;
-              }
-
-              // Resolve category head name to ID (optional)
-              const categoryHeadName =
-                row.categoryheadname ||
-                row.categoryheadname ||
-                row.categoryheadid ||
-                row.categoryheadid ||
-                "";
-              let categoryHeadId: number | null = null;
-
-              if (categoryHeadName) {
-                // Try as ID first
-                const idMatch = parseInt(categoryHeadName);
-                if (!isNaN(idMatch)) {
-                  categoryHeadId = idMatch;
-                } else {
-                  // Try as name
-                  categoryHeadId =
-                    categoryHeadMap.get(
-                      categoryHeadName.toLowerCase().trim()
-                    ) || null;
-                  if (
-                    !categoryHeadId &&
-                    categoryHeadName.toLowerCase() !== "none" &&
-                    categoryHeadName.toLowerCase() !== "general"
-                  ) {
-                    errors.push(
-                      `Row ${rowNumber}: Category head "${categoryHeadName}" not found for this school`
-                    );
-                    continue;
-                  }
-                }
-              }
-
-              // Resolve class name to ID
-              const className =
-                row.classname ||
-                row.classname ||
-                row.classid ||
-                row.classid ||
-                "";
-              let classId: number | null = null;
-
-              if (className) {
-                // Try as ID first
-                const idMatch = parseInt(className);
-                if (!isNaN(idMatch)) {
-                  classId = idMatch;
-                } else {
-                  // Try as name
-                  classId =
-                    classMap.get(className.toLowerCase().trim()) || null;
-                  if (!classId) {
-                    errors.push(
-                      `Row ${rowNumber}: Class "${className}" not found for this school`
-                    );
-                    continue;
-                  }
-                }
-              } else {
-                errors.push(`Row ${rowNumber}: Class is required`);
-                continue;
-              }
-
-              const amount = parseFloat(row.amount || "0");
-              if (!amount || amount <= 0) {
-                errors.push(`Row ${rowNumber}: Valid amount is required`);
-                continue;
-              }
-
-              const status = (row.status || "active").toLowerCase();
-              const name = row.name || "";
-
-              data.push({
-                schoolId: importSchoolId,
-                feeCategoryId,
-                categoryHeadId,
-                classId,
-                amount,
-                status:
-                  status === "active" || status === "inactive"
-                    ? status
-                    : "active",
-                name,
-                // Store original names for preview
-                feeCategoryName: feeCategoryName,
-                categoryHeadName: categoryHeadName || "General",
-                className: className,
-              });
-            }
-
-            if (errors.length > 0 && data.length === 0) {
-              reject(
-                new Error(
-                  `CSV parsing errors:\n${errors.slice(0, 10).join("\n")}${
-                    errors.length > 10
-                      ? `\n... and ${errors.length - 10} more`
-                      : ""
-                  }`
-                )
-              );
-              return;
-            }
-
-            resolve(data);
-          } catch (err) {
-            reject(new Error("Failed to parse CSV file"));
-          }
-        };
-        reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsText(file);
+      // Use utility function to parse CSV
+      return readAndParseCSV(file, {
+        feeCategoryMap,
+        categoryHeadMap,
+        classMap,
+        schoolId: importSchoolId,
       });
     },
     [importSchoolId]
@@ -292,37 +126,8 @@ export function useFeePlanImport({
       return;
     }
 
-    const headers = [
-      "feeCategoryName",
-      "categoryHeadName",
-      "className",
-      "amount",
-      "status",
-      "name",
-    ];
-    const sampleRow = [
-      "Tuition Fee",
-      "",
-      "1st",
-      "5000.00",
-      "active",
-      "Tuition Fee - General (1st)",
-    ];
-
-    const csvContent = [
-      headers.map((h) => `"${h}"`).join(","),
-      sampleRow.map((cell) => `"${cell}"`).join(","),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `fee_plans_sample_${importSchoolId}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csvContent = generateSampleCSV();
+    downloadCSV(csvContent, `fee_plans_sample_${importSchoolId}.csv`);
   }, [importSchoolId, setError]);
 
   // Handle file drop
@@ -433,19 +238,15 @@ export function useFeePlanImport({
           continue;
         }
 
-        // Check for duplicates
-        const existing = existingStructures.find((existing: FeeStructure) => {
-          const matchesFeeCategory =
-            existing.feeCategoryId === planData.feeCategoryId;
-          const matchesCategoryHead =
-            existing.categoryHeadId === planData.categoryHeadId ||
-            (!existing.categoryHeadId && !planData.categoryHeadId);
-          const matchesClass =
-            existing.classId === planData.classId ||
-            (!existing.classId && !planData.classId);
-
-          return matchesFeeCategory && matchesCategoryHead && matchesClass;
-        });
+        // Check for duplicates using utility function
+        const existing = findDuplicate(
+          {
+            feeCategoryId: planData.feeCategoryId,
+            categoryHeadId: planData.categoryHeadId,
+            classId: planData.classId,
+          },
+          existingStructures
+        );
 
         if (existing) {
           results.skipped++;

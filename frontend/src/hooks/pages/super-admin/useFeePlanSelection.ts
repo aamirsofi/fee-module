@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 import { FeeStructure } from "../../../types";
+import { convertToCSV, downloadCSV } from "../../../utils/feePlan";
 
 interface UseFeePlanSelectionParams {
   feeStructures: FeeStructure[];
@@ -107,24 +108,12 @@ export function useFeePlanSelection({
       ];
     });
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    // Download CSV
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
+    // Use utility function to convert and download CSV
+    const csvContent = convertToCSV(headers, rows);
+    downloadCSV(
+      csvContent,
       `fee-plans-${new Date().toISOString().split("T")[0]}.csv`
     );
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
 
     setSuccess(
       `Exported ${selectedFeePlanIds.length} fee plan(s) successfully!`
