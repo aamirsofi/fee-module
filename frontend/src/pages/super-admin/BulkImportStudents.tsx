@@ -1,57 +1,47 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiUpload, FiArrowLeft, FiLoader } from "react-icons/fi";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import api from "../../services/api";
+import { schoolService, School } from "../../services/schoolService";
 import StudentBulkImport from "../../components/StudentBulkImport";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-interface School {
-  id: number;
-  name: string;
-  subdomain: string;
-  status: string;
-}
-
 export default function BulkImportStudents() {
   const navigate = useNavigate();
-  const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(null);
-  const [loadingSchools, setLoadingSchools] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    loadSchools();
-  }, []);
-
-  const loadSchools = async () => {
-    try {
-      setLoadingSchools(true);
-      setError("");
-      // Fetch all active schools
-      const allSchools: School[] = [];
-      let page = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        const response = await api.instance.get("/super-admin/schools", {
-          params: { page, limit: 100, status: "active" },
-        });
-        const { data, meta } = response.data;
-        allSchools.push(...data);
-        hasMore = page < meta.totalPages;
-        page++;
+  // Use TanStack Query for schools (using infinite query for pagination)
+  const {
+    data: schoolsData,
+    isLoading: loadingSchools,
+  } = useInfiniteQuery({
+    queryKey: ["schools", "active"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await schoolService.getSchools({
+        page: pageParam,
+        limit: 100,
+        status: "active",
+      });
+      return response;
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.meta && lastPage.meta.hasNextPage) {
+        return lastPage.meta.page + 1;
       }
+      return undefined;
+    },
+    initialPageParam: 1,
+  });
 
-      setSchools(allSchools);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load schools");
-    } finally {
-      setLoadingSchools(false);
-    }
-  };
+  const schools: School[] = useMemo(() => {
+    if (!schoolsData?.pages) return [];
+    return schoolsData.pages.flatMap((page) => page.data || []);
+  }, [schoolsData]);
 
   const handleImportSuccess = () => {
     setSuccess("Students imported successfully!");

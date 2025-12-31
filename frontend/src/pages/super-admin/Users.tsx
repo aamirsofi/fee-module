@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   FiEdit,
   FiTrash2,
@@ -9,7 +9,9 @@ import {
   FiX,
   FiSearch,
 } from "react-icons/fi";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import api from "../../services/api";
+import { schoolService, School } from "../../services/schoolService";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import {
   Card,
@@ -32,14 +34,6 @@ interface User {
   createdAt: string;
 }
 
-interface School {
-  id: number;
-  name: string;
-  subdomain: string;
-  email?: string;
-  status: string;
-}
-
 interface PaginationMeta {
   total: number;
   page: number;
@@ -51,9 +45,7 @@ interface PaginationMeta {
 
 export default function SuperAdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingSchools, setLoadingSchools] = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -71,70 +63,35 @@ export default function SuperAdminUsers() {
     null
   );
 
+  // Use TanStack Query for schools (using infinite query for pagination)
+  const { data: schoolsData, isLoading: loadingSchools } = useInfiniteQuery({
+    queryKey: ["schools", "active"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await schoolService.getSchools({
+        page: pageParam,
+        limit: 100,
+        status: "active",
+      });
+      return response;
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.meta && lastPage.meta.hasNextPage) {
+        return lastPage.meta.page + 1;
+      }
+      return undefined;
+    },
+    initialPageParam: 1,
+  });
+
+  const schools: School[] = useMemo(() => {
+    if (!schoolsData?.pages) return [];
+    return schoolsData.pages.flatMap((page) => page.data || []);
+  }, [schoolsData]);
+
   useEffect(() => {
     loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
-
-  useEffect(() => {
-    loadSchools();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadSchools = async () => {
-    try {
-      setLoadingSchools(true);
-      setError(""); // Clear any previous errors
-
-      // Fetch all schools - backend max limit is 100, so we'll fetch all pages if needed
-      let allSchools: School[] = [];
-      let currentPage = 1;
-      let hasMorePages = true;
-      const pageLimit = 100; // Maximum allowed by backend
-
-      while (hasMorePages) {
-        const response = await api.instance.get("/super-admin/schools", {
-          params: { page: currentPage, limit: pageLimit, status: "active" },
-        });
-
-        if (
-          response.data &&
-          response.data.data &&
-          Array.isArray(response.data.data)
-        ) {
-          allSchools = [...allSchools, ...response.data.data];
-
-          // Check if there are more pages
-          const meta = response.data.meta;
-          if (meta && meta.hasNextPage) {
-            currentPage++;
-          } else {
-            hasMorePages = false;
-          }
-        } else if (Array.isArray(response.data)) {
-          // Fallback: direct array response
-          allSchools = [...allSchools, ...response.data];
-          hasMorePages = false;
-        } else {
-          hasMorePages = false;
-        }
-      }
-
-      console.log("Loaded", allSchools.length, "schools total");
-      setSchools(allSchools);
-    } catch (err: any) {
-      console.error("Error loading schools:", err);
-      console.error("Error response:", err.response);
-      console.error("Error details:", err.response?.data);
-      const errorMessage =
-        err.response?.data?.message || err.message || "Failed to load schools";
-      console.error("Error message:", errorMessage);
-      // Don't set error state here as it might interfere with user form errors
-      setSchools([]);
-    } finally {
-      setLoadingSchools(false);
-    }
-  };
 
   const loadUsers = async () => {
     try {

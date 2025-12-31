@@ -9,7 +9,9 @@ import {
   FiDownload,
 } from "react-icons/fi";
 import { useDropzone } from "react-dropzone";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import api from "../../services/api";
+import { schoolService, School } from "../../services/schoolService";
 import Pagination from "../../components/Pagination";
 import {
   Card,
@@ -41,14 +43,6 @@ interface Class {
   updatedAt: string;
 }
 
-interface School {
-  id: number;
-  name: string;
-  subdomain: string;
-  email?: string;
-  status: string;
-}
-
 interface PaginationMeta {
   total: number;
   page: number;
@@ -60,9 +54,7 @@ interface PaginationMeta {
 
 export default function Classes() {
   const [classes, setClasses] = useState<Class[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingSchools, setLoadingSchools] = useState(true);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [mode, setMode] = useState<"add" | "import">("add");
   const [formData, setFormData] = useState({
@@ -92,60 +84,33 @@ export default function Classes() {
     null
   );
 
+  // Use TanStack Query for schools (using infinite query for pagination)
+  const { data: schoolsData, isLoading: loadingSchools } = useInfiniteQuery({
+    queryKey: ["schools", "active"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await schoolService.getSchools({
+        page: pageParam,
+        limit: 100,
+        status: "active",
+      });
+      return response;
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.meta && lastPage.meta.hasNextPage) {
+        return lastPage.meta.page + 1;
+      }
+      return undefined;
+    },
+    initialPageParam: 1,
+  });
+
+  const schools: School[] =
+    schoolsData?.pages.flatMap((page) => page.data || []) || [];
+
   useEffect(() => {
     loadClasses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search, selectedSchoolId]);
-
-  useEffect(() => {
-    loadSchools();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadSchools = async () => {
-    try {
-      setLoadingSchools(true);
-      setError("");
-
-      let allSchools: School[] = [];
-      let currentPage = 1;
-      let hasMorePages = true;
-      const pageLimit = 100;
-
-      while (hasMorePages) {
-        const response = await api.instance.get("/super-admin/schools", {
-          params: { page: currentPage, limit: pageLimit, status: "active" },
-        });
-
-        if (
-          response.data &&
-          response.data.data &&
-          Array.isArray(response.data.data)
-        ) {
-          allSchools = [...allSchools, ...response.data.data];
-
-          const meta = response.data.meta;
-          if (meta && meta.hasNextPage) {
-            currentPage++;
-          } else {
-            hasMorePages = false;
-          }
-        } else if (Array.isArray(response.data)) {
-          allSchools = [...allSchools, ...response.data];
-          hasMorePages = false;
-        } else {
-          hasMorePages = false;
-        }
-      }
-
-      setSchools(allSchools);
-    } catch (err: any) {
-      console.error("Error loading schools:", err);
-      setError(err.response?.data?.message || "Failed to load schools");
-    } finally {
-      setLoadingSchools(false);
-    }
-  };
 
   const loadClasses = async () => {
     try {
