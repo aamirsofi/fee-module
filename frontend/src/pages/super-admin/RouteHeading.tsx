@@ -8,6 +8,10 @@ import RoutesForm from "./components/RoutesForm";
 import RoutesFilters from "./components/RoutesFilters";
 import RoutesTable from "./components/RoutesTable";
 import RoutesDialogs from "./components/RoutesDialogs";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
 
 export default function RouteHeading() {
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
@@ -156,14 +160,18 @@ export default function RouteHeading() {
     <div className="space-y-6">
       {/* Success/Error Messages */}
       {success && (
-        <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
-          <p className="text-green-700">{success}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="pt-6">
+            <p className="text-green-700">{success}</p>
+          </CardContent>
+        </Card>
       )}
       {error && (
-        <div className="card-modern rounded-xl p-4 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{error}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-red-700">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -179,32 +187,34 @@ export default function RouteHeading() {
         />
 
         {/* Right Side - List */}
-        <div className="card-modern rounded-xl p-4 lg:col-span-2">
-          {/* Search and Filter */}
-          <RoutesFilters
-            search={search}
-            setSearch={setSearch}
-            selectedSchoolId={selectedSchoolId}
-            setSelectedSchoolId={setSelectedSchoolId}
-            schools={schools}
-            setPage={setPage}
-          />
+        <Card className="lg:col-span-2">
+          <CardContent className="pt-6">
+            {/* Search and Filter */}
+            <RoutesFilters
+              search={search}
+              setSearch={setSearch}
+              selectedSchoolId={selectedSchoolId}
+              setSelectedSchoolId={setSelectedSchoolId}
+              schools={schools}
+              setPage={setPage}
+            />
 
-          {/* Table */}
-          <RoutesTable
-            routes={routes}
-            loading={loadingRoutes}
-            paginationMeta={paginationMeta}
-            page={page}
-            limit={limit}
-            setPage={setPage}
-            setLimit={setLimit}
-            search={search}
-            selectedSchoolId={selectedSchoolId}
-            handleEdit={handleEdit}
-            handleDeleteClick={handleDeleteClick}
-          />
-        </div>
+            {/* Table */}
+            <RoutesTable
+              routes={routes}
+              loading={loadingRoutes}
+              paginationMeta={paginationMeta}
+              page={page}
+              limit={limit}
+              setPage={setPage}
+              setLimit={setLimit}
+              search={search}
+              selectedSchoolId={selectedSchoolId}
+              handleEdit={handleEdit}
+              handleDeleteClick={handleDeleteClick}
+            />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Dialogs */}

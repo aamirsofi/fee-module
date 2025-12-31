@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -91,8 +92,42 @@ export class UsersService {
       }
     }
 
+    // Handle password update with current password verification
+    if (updateUserDto.password) {
+      if (!updateUserDto.currentPassword) {
+        throw new BadRequestException('Current password is required to update password');
+      }
+
+      // Get user with password field for verification
+      const userWithPassword = await this.usersRepository.findOne({
+        where: { id },
+        select: ['id', 'name', 'email', 'password', 'role', 'schoolId', 'createdAt', 'updatedAt'],
+      });
+
+      if (!userWithPassword) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+
+      // Verify current password
+      const isPasswordValid = await bcrypt.compare(
+        updateUserDto.currentPassword,
+        userWithPassword.password,
+      );
+
+      if (!isPasswordValid) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(updateUserDto.password, 10);
+      updateUserDto.password = hashedPassword;
+    }
+
+    // Remove currentPassword from DTO before saving (it's not a user field)
+    const { currentPassword, ...userUpdateData } = updateUserDto;
+
     try {
-      Object.assign(user, updateUserDto);
+      Object.assign(user, userUpdateData);
       return await this.usersRepository.save(user);
     } catch (error: any) {
       // Handle PostgreSQL unique constraint violations (error code 23505)

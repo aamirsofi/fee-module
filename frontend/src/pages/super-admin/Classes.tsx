@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardContent,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -509,22 +510,29 @@ export default function Classes() {
 
       {/* Success/Error Messages */}
       {success && (
-        <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
-          <p className="text-green-700">{success}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="pt-6">
+            <p className="text-green-700">{success}</p>
+          </CardContent>
+        </Card>
       )}
       {error && (
-        <div className="card-modern rounded-xl p-4 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{error}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-red-700">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side - Add/Edit Form or Import */}
-        <div className="card-modern rounded-xl p-4 lg:col-span-1">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">
-            {editingClass ? "Edit Class" : "Class Management"}
-          </h2>
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-gray-800">
+              {editingClass ? "Edit Class" : "Class Management"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
           <Tabs
             value={mode}
             onValueChange={(value) => {
@@ -915,12 +923,14 @@ export default function Classes() {
               </>
             </TabsContent>
           </Tabs>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Right Side - Listing */}
-        <div className="card-modern rounded-xl p-4 lg:col-span-2">
-          {/* Filters */}
-          <div className="mb-4 space-y-3">
+        <Card className="lg:col-span-2">
+          <CardContent className="pt-6">
+            {/* Filters */}
+            <div className="mb-4 space-y-3">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1">
                 <div className="relative">
@@ -1079,7 +1089,8 @@ export default function Classes() {
               />
             </>
           )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

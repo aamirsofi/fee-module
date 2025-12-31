@@ -295,19 +295,23 @@ export default function RoutePlans() {
 
       {/* Success/Error Messages */}
       {success && (
-        <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
-          <p className="text-green-700">{success}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="pt-6">
+            <p className="text-green-700">{success}</p>
+          </CardContent>
+        </Card>
       )}
       {error && (
-        <div className="card-modern rounded-xl p-4 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{error}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-red-700">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Tabs */}
       <Card>
-        <CardHeader>
+        <CardContent>
           <Tabs
             value={activeTab}
             onValueChange={(value) => {
@@ -678,207 +682,213 @@ export default function RoutePlans() {
                 </Card>
 
                 {/* Right Side - List */}
-                <div className="card-modern rounded-xl p-4 lg:col-span-2">
-                  {/* Search and Filter */}
-                  <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative">
-                      <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <Input
-                        type="text"
-                        value={routePlanSearch}
-                        onChange={(e) => {
-                          setRoutePlanSearch(e.target.value);
-                          setRoutePlanPage(1);
-                        }}
-                        placeholder="Search by name or description..."
-                        className="w-full pl-10 pr-10"
-                      />
-                      {routePlanSearch && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setRoutePlanSearch("");
+                <Card className="lg:col-span-2">
+                  <CardContent className="pt-6">
+                    {/* Search and Filter */}
+                    <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="relative">
+                        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Input
+                          type="text"
+                          value={routePlanSearch}
+                          onChange={(e) => {
+                            setRoutePlanSearch(e.target.value);
                             setRoutePlanPage(1);
                           }}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 h-auto p-1 text-gray-400 hover:text-gray-600"
-                        >
-                          <FiX className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div>
-                      <Select
-                        value={
-                          routePlanSelectedSchoolId
-                            ? routePlanSelectedSchoolId.toString()
-                            : "__EMPTY__"
-                        }
-                        onValueChange={(value) => {
-                          setRoutePlanSelectedSchoolId(
-                            value === "__EMPTY__" ? "" : parseInt(value)
-                          );
-                          setRoutePlanPage(1);
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__EMPTY__">All Schools</SelectItem>
-                          {routePlanSchools.map((school) => (
-                            <SelectItem
-                              key={school.id}
-                              value={school.id.toString()}
-                            >
-                              {school.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Table */}
-                  {loadingRoutePlans ? (
-                    <div className="flex items-center justify-center py-12">
-                      <FiLoader className="w-6 h-6 animate-spin text-indigo-600" />
-                      <span className="ml-2 text-gray-600">
-                        Loading route plans...
-                      </span>
-                    </div>
-                  ) : routePlans.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500">
-                      No route plans found. Create your first route plan!
-                    </div>
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-gray-200">
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                Name
-                              </th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                School
-                              </th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                Route
-                              </th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                Fee Heading
-                              </th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                Category Head
-                              </th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                Class
-                              </th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                Amount
-                              </th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                Status
-                              </th>
-                              <th className="text-right py-2 px-3 font-semibold text-gray-700">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {routePlans.map((plan) => (
-                              <tr
-                                key={plan.id}
-                                className="border-b border-gray-100 hover:bg-gray-50"
-                              >
-                                <td className="py-2 px-3 font-semibold">
-                                  {plan.name}
-                                </td>
-                                <td className="py-2 px-3">
-                                  {plan.school?.name ||
-                                    `School ID: ${plan.schoolId}`}
-                                </td>
-                                <td className="py-2 px-3">
-                                  {plan.route?.name ||
-                                    `Route ID: ${plan.routeId}`}
-                                </td>
-                                <td className="py-2 px-3">
-                                  {plan.feeCategory?.name ||
-                                    `Fee ID: ${plan.feeCategoryId}`}
-                                </td>
-                                <td className="py-2 px-3">
-                                  {plan.categoryHead?.name || "General"}
-                                </td>
-                                <td className="py-2 px-3">
-                                  {plan.class?.name ||
-                                    `Class ID: ${plan.classId}`}
-                                </td>
-                                <td className="py-2 px-3">
-                                  ₹
-                                  {parseFloat(plan.amount.toString()).toFixed(
-                                    2
-                                  )}
-                                </td>
-                                <td className="py-2 px-3">
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      plan.status === "active"
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-gray-100 text-gray-800"
-                                    }`}
-                                  >
-                                    {plan.status}
-                                  </span>
-                                </td>
-                                <td className="py-2 px-3">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRoutePlanEdit(plan)}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      <FiEdit className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleRoutePlanDeleteClick(
-                                          plan.id,
-                                          plan.schoolId
-                                        )
-                                      }
-                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                    >
-                                      <FiTrash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                          placeholder="Search by name or description..."
+                          className="w-full pl-10 pr-10"
+                        />
+                        {routePlanSearch && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setRoutePlanSearch("");
+                              setRoutePlanPage(1);
+                            }}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 h-auto p-1 text-gray-400 hover:text-gray-600"
+                          >
+                            <FiX className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
 
-                      {/* Pagination */}
-                      {routePlanPaginationMeta && (
-                        <div className="mt-4">
-                          <Pagination
-                            paginationMeta={routePlanPaginationMeta}
-                            page={routePlanPage}
-                            limit={routePlanLimit}
-                            onPageChange={setRoutePlanPage}
-                            onLimitChange={setRoutePlanLimit}
-                            itemName="route plans"
-                          />
+                      <div>
+                        <Select
+                          value={
+                            routePlanSelectedSchoolId
+                              ? routePlanSelectedSchoolId.toString()
+                              : "__EMPTY__"
+                          }
+                          onValueChange={(value) => {
+                            setRoutePlanSelectedSchoolId(
+                              value === "__EMPTY__" ? "" : parseInt(value)
+                            );
+                            setRoutePlanPage(1);
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__EMPTY__">
+                              All Schools
+                            </SelectItem>
+                            {routePlanSchools.map((school) => (
+                              <SelectItem
+                                key={school.id}
+                                value={school.id.toString()}
+                              >
+                                {school.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Table */}
+                    {loadingRoutePlans ? (
+                      <div className="flex items-center justify-center py-12">
+                        <FiLoader className="w-6 h-6 animate-spin text-indigo-600" />
+                        <span className="ml-2 text-gray-600">
+                          Loading route plans...
+                        </span>
+                      </div>
+                    ) : routePlans.length === 0 ? (
+                      <div className="text-center py-12 text-gray-500">
+                        No route plans found. Create your first route plan!
+                      </div>
+                    ) : (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  Name
+                                </th>
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  School
+                                </th>
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  Route
+                                </th>
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  Fee Heading
+                                </th>
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  Category Head
+                                </th>
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  Class
+                                </th>
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  Amount
+                                </th>
+                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                  Status
+                                </th>
+                                <th className="text-right py-2 px-3 font-semibold text-gray-700">
+                                  Actions
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {routePlans.map((plan) => (
+                                <tr
+                                  key={plan.id}
+                                  className="border-b border-gray-100 hover:bg-gray-50"
+                                >
+                                  <td className="py-2 px-3 font-semibold">
+                                    {plan.name}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    {plan.school?.name ||
+                                      `School ID: ${plan.schoolId}`}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    {plan.route?.name ||
+                                      `Route ID: ${plan.routeId}`}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    {plan.feeCategory?.name ||
+                                      `Fee ID: ${plan.feeCategoryId}`}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    {plan.categoryHead?.name || "General"}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    {plan.class?.name ||
+                                      `Class ID: ${plan.classId}`}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    ₹
+                                    {parseFloat(plan.amount.toString()).toFixed(
+                                      2
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        plan.status === "active"
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-gray-100 text-gray-800"
+                                      }`}
+                                    >
+                                      {plan.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleRoutePlanEdit(plan)
+                                        }
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <FiEdit className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleRoutePlanDeleteClick(
+                                            plan.id,
+                                            plan.schoolId
+                                          )
+                                        }
+                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                      >
+                                        <FiTrash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      )}
-                    </>
-                  )}
-                </div>
+
+                        {/* Pagination */}
+                        {routePlanPaginationMeta && (
+                          <div className="mt-4">
+                            <Pagination
+                              paginationMeta={routePlanPaginationMeta}
+                              page={routePlanPage}
+                              limit={routePlanLimit}
+                              onPageChange={setRoutePlanPage}
+                              onLimitChange={setRoutePlanLimit}
+                              itemName="route plans"
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
 
@@ -887,7 +897,7 @@ export default function RoutePlans() {
               <RouteHeading />
             </TabsContent>
           </Tabs>
-        </CardHeader>
+        </CardContent>
       </Card>
 
       {/* Route Plan Delete Dialog */}
