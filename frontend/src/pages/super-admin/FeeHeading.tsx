@@ -809,7 +809,7 @@ export default function FeeHeading() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Add Fee Category
+              Add Fee Heading
             </button>
             <button
               onClick={() => {
@@ -824,14 +824,14 @@ export default function FeeHeading() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Import Fee Categories
+              Import Fee Headings
             </button>
           </div>
 
           {mode === "add" ? (
             <>
               <h2 className="text-xl font-bold text-gray-800 mb-4">
-                {editingCategory ? "Edit Fee Category" : "Add Fee Category"}
+                {editingCategory ? "Edit Fee Heading" : "Add Fee Heading"}
               </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -1054,7 +1054,7 @@ export default function FeeHeading() {
           ) : (
             <>
               <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Import Fee Categories from CSV
+                Import Fee Headings from CSV
               </h2>
 
               <div className="space-y-4">
