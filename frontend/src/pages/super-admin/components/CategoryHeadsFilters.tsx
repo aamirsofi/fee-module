@@ -26,7 +26,7 @@ export default function CategoryHeadsFilters({
   setPage,
 }: CategoryHeadsFiltersProps) {
   return (
-    <div className="mb-4 space-y-3">
+    <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="relative">
         <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <input
@@ -53,9 +53,6 @@ export default function CategoryHeadsFilters({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Filter by School
-        </label>
         <Select
           value={selectedSchoolId ? selectedSchoolId.toString() : "__EMPTY__"}
           onValueChange={(value) => {
@@ -64,7 +61,7 @@ export default function CategoryHeadsFilters({
           }}
         >
           <SelectTrigger className="w-full">
-            <SelectValue />
+            <SelectValue placeholder="Filter by School" />
           </SelectTrigger>
           <SelectContent className="max-h-[300px]">
             <SelectItem value="__EMPTY__">All Schools</SelectItem>
