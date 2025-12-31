@@ -31,7 +31,7 @@ export class FeeStructuresService {
     }
     return await this.feeStructuresRepository.find({
       where,
-      relations: ['school', 'category'],
+      relations: ['school', 'category', 'class'],
       order: { createdAt: 'desc' },
     });
   }
@@ -43,7 +43,7 @@ export class FeeStructuresService {
     }
     const feeStructure = await this.feeStructuresRepository.findOne({
       where,
-      relations: ['school', 'category', 'payments', 'studentStructures'],
+      relations: ['school', 'category', 'class', 'payments', 'studentStructures'],
     });
 
     if (!feeStructure) {

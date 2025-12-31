@@ -4,15 +4,30 @@ import {
   FiTrash2,
   FiLoader,
   FiBook,
-  FiX,
   FiSearch,
   FiUpload,
   FiDownload,
 } from "react-icons/fi";
 import { useDropzone } from "react-dropzone";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import api from "../../services/api";
-import CustomDropdown from "../../components/ui/CustomDropdown";
+import { schoolService, School } from "../../services/schoolService";
 import Pagination from "../../components/Pagination";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Class {
   id: number;
@@ -29,14 +44,6 @@ interface Class {
   updatedAt: string;
 }
 
-interface School {
-  id: number;
-  name: string;
-  subdomain: string;
-  email?: string;
-  status: string;
-}
-
 interface PaginationMeta {
   total: number;
   page: number;
@@ -48,9 +55,7 @@ interface PaginationMeta {
 
 export default function Classes() {
   const [classes, setClasses] = useState<Class[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingSchools, setLoadingSchools] = useState(true);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [mode, setMode] = useState<"add" | "import">("add");
   const [formData, setFormData] = useState({
@@ -80,74 +85,40 @@ export default function Classes() {
     null
   );
 
+  // Use TanStack Query for schools (using infinite query for pagination)
+  const { data: schoolsData, isLoading: loadingSchools } = useInfiniteQuery({
+    queryKey: ["schools", "active"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await schoolService.getSchools({
+        page: pageParam,
+        limit: 100,
+        status: "active",
+      });
+      return response;
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.meta && lastPage.meta.hasNextPage) {
+        return lastPage.meta.page + 1;
+      }
+      return undefined;
+    },
+    initialPageParam: 1,
+  });
+
+  const schools: School[] =
+    schoolsData?.pages.flatMap((page) => page.data || []) || [];
+
   useEffect(() => {
     loadClasses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search, selectedSchoolId]);
 
-  useEffect(() => {
-    loadSchools();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadSchools = async () => {
-    try {
-      setLoadingSchools(true);
-      setError("");
-
-      let allSchools: School[] = [];
-      let currentPage = 1;
-      let hasMorePages = true;
-      const pageLimit = 100;
-
-      while (hasMorePages) {
-        const response = await api.instance.get("/super-admin/schools", {
-          params: { page: currentPage, limit: pageLimit, status: "active" },
-        });
-
-        if (
-          response.data &&
-          response.data.data &&
-          Array.isArray(response.data.data)
-        ) {
-          allSchools = [...allSchools, ...response.data.data];
-
-          const meta = response.data.meta;
-          if (meta && meta.hasNextPage) {
-            currentPage++;
-          } else {
-            hasMorePages = false;
-          }
-        } else if (Array.isArray(response.data)) {
-          allSchools = [...allSchools, ...response.data];
-          hasMorePages = false;
-        } else {
-          hasMorePages = false;
-        }
-      }
-
-      setSchools(allSchools);
-    } catch (err: any) {
-      console.error("Error loading schools:", err);
-      setError(err.response?.data?.message || "Failed to load schools");
-    } finally {
-      setLoadingSchools(false);
-    }
-  };
-
   const loadClasses = async () => {
-    if (!selectedSchoolId) {
-      setClasses([]);
-      setPaginationMeta(null);
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError("");
 
-      const params: any = { page, limit };
+      const params: Record<string, string | number> = { page, limit };
       if (selectedSchoolId) {
         params.schoolId = selectedSchoolId;
       }
@@ -192,14 +163,14 @@ export default function Classes() {
 
     try {
       const urlParams = `?schoolId=${formData.schoolId}`;
-      
+
       // Exclude schoolId from the request body - it comes from query param
       const payload = {
         name: formData.name,
         description: formData.description || undefined,
         status: formData.status,
       };
-      
+
       if (editingClass) {
         await api.instance.patch(
           `/classes/${editingClass.id}${urlParams}`,
@@ -240,14 +211,12 @@ export default function Classes() {
     }
 
     try {
-      const urlParams = schoolId ? `?schoolId=${schoolId}` : '';
+      const urlParams = schoolId ? `?schoolId=${schoolId}` : "";
       await api.instance.delete(`/classes/${id}${urlParams}`);
       setSuccess("Class deleted successfully");
       loadClasses();
     } catch (err: any) {
-      setError(
-        err.response?.data?.message || "Failed to delete class"
-      );
+      setError(err.response?.data?.message || "Failed to delete class");
     }
   };
 
@@ -275,12 +244,14 @@ export default function Classes() {
     }
 
     const headers = ["schoolId", "name", "description", "status"];
-    const sampleRow = [importSchoolId.toString(), "Grade 1", "First grade class", "active"];
-    
-    const csvContent = [
-      headers.join(","),
-      sampleRow.join(","),
-    ].join("\n");
+    const sampleRow = [
+      importSchoolId.toString(),
+      "Grade 1",
+      "First grade class",
+      "active",
+    ];
+
+    const csvContent = [headers.join(","), sampleRow.join(",")].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -294,76 +265,88 @@ export default function Classes() {
   };
 
   // Parse CSV file
-  const parseCSV = useCallback((file: File): Promise<any[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const text = e.target?.result as string;
-          const lines = text.split("\n").filter((line) => line.trim());
-          
-          if (lines.length < 2) {
-            reject(new Error("CSV file must have at least a header row and one data row"));
-            return;
-          }
+  const parseCSV = useCallback(
+    (file: File): Promise<any[]> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const text = e.target?.result as string;
+            const lines = text.split("\n").filter((line) => line.trim());
 
-          const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-          const data: any[] = [];
-
-          for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(",").map((v) => v.trim());
-            const row: any = {};
-            
-            headers.forEach((header, index) => {
-              row[header] = values[index] || "";
-            });
-
-            if (row.name) {
-              data.push({
-                schoolId: row.schoolid || importSchoolId,
-                name: row.name,
-                description: row.description || "",
-                status: row.status || "active",
-              });
+            if (lines.length < 2) {
+              reject(
+                new Error(
+                  "CSV file must have at least a header row and one data row"
+                )
+              );
+              return;
             }
-          }
 
-          resolve(data);
-        } catch (err) {
-          reject(new Error("Failed to parse CSV file"));
-        }
-      };
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsText(file);
-    });
-  }, [importSchoolId]);
+            const headers = lines[0]
+              .split(",")
+              .map((h) => h.trim().toLowerCase());
+            const data: any[] = [];
+
+            for (let i = 1; i < lines.length; i++) {
+              const values = lines[i].split(",").map((v) => v.trim());
+              const row: any = {};
+
+              headers.forEach((header, index) => {
+                row[header] = values[index] || "";
+              });
+
+              if (row.name) {
+                data.push({
+                  schoolId: row.schoolid || importSchoolId,
+                  name: row.name,
+                  description: row.description || "",
+                  status: row.status || "active",
+                });
+              }
+            }
+
+            resolve(data);
+          } catch (err) {
+            reject(new Error("Failed to parse CSV file"));
+          }
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsText(file);
+      });
+    },
+    [importSchoolId]
+  );
 
   // Handle file drop
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      const file = acceptedFiles[0];
+      if (!file) return;
 
-    if (!importSchoolId) {
-      setError("Please select a school first");
-      return;
-    }
+      if (!importSchoolId) {
+        setError("Please select a school first");
+        return;
+      }
 
-    if (!file.name.match(/\.(csv)$/i)) {
-      setError("Please upload a CSV file");
-      return;
-    }
+      if (!file.name.match(/\.(csv)$/i)) {
+        setError("Please upload a CSV file");
+        return;
+      }
 
-    try {
-      setImportFile(file);
-      const data = await parseCSV(file);
-      setImportPreview(data.slice(0, 10)); // Preview first 10 rows
-      setError("");
-    } catch (err: any) {
-      setError(err.message || "Failed to parse CSV file");
-      setImportFile(null);
-      setImportPreview([]);
-    }
-  }, [importSchoolId, parseCSV]);
+      try {
+        setImportFile(file);
+        const data = await parseCSV(file);
+        setImportPreview(data.slice(0, 10)); // Preview first 10 rows
+        setError("");
+      } catch (err: any) {
+        setError(err.message || "Failed to parse CSV file");
+        setImportFile(null);
+        setImportPreview([]);
+      }
+    },
+    [importSchoolId, parseCSV]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -387,7 +370,7 @@ export default function Classes() {
       setImportResult(null);
 
       const classesData = await parseCSV(importFile);
-      
+
       if (classesData.length === 0) {
         setError("No valid classes found in CSV file");
         return;
@@ -397,7 +380,8 @@ export default function Classes() {
       const existingClassesResponse = await api.instance.get("/classes", {
         params: { schoolId: importSchoolId, limit: 1000 },
       });
-      const existingClasses = existingClassesResponse.data.data || existingClassesResponse.data || [];
+      const existingClasses =
+        existingClassesResponse.data.data || existingClassesResponse.data || [];
       const existingClassNames = new Set(
         existingClasses.map((cls: Class) => cls.name.toLowerCase().trim())
       );
@@ -460,8 +444,9 @@ export default function Classes() {
           // Add to existing set to prevent duplicates within the same import batch
           existingClassNames.add(classNameLower);
         } catch (err: any) {
-          const errorMessage = err.response?.data?.message || "Failed to create class";
-          
+          const errorMessage =
+            err.response?.data?.message || "Failed to create class";
+
           // Check if it's a duplicate error
           if (errorMessage.toLowerCase().includes("already exists")) {
             results.skipped++;
@@ -493,10 +478,14 @@ export default function Classes() {
         loadClasses();
       }
       if (results.failed > 0) {
-        setError(`${results.failed} class(es) failed to import. Check errors below.`);
+        setError(
+          `${results.failed} class(es) failed to import. Check errors below.`
+        );
       }
       if (results.skipped > 0 && results.success === 0) {
-        setError(`All ${results.skipped} class(es) were duplicates and skipped.`);
+        setError(
+          `All ${results.skipped} class(es) were duplicates and skipped.`
+        );
       }
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to import classes");
@@ -508,391 +497,440 @@ export default function Classes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-          Class Management
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">
-          Create and manage classes for schools
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+            Class Management
+          </CardTitle>
+          <CardDescription>
+            Create and manage classes for schools
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Success/Error Messages */}
       {success && (
-        <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
-          <p className="text-green-700">{success}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="pt-6">
+            <p className="text-green-700">{success}</p>
+          </CardContent>
+        </Card>
       )}
       {error && (
-        <div className="card-modern rounded-xl p-4 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{error}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-red-700">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side - Add/Edit Form or Import */}
-        <div className="card-modern rounded-xl p-4 lg:col-span-1">
-          {/* Tabs */}
-          <div className="flex gap-2 mb-4 border-b border-gray-200">
-            <button
-              onClick={() => {
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-gray-800">
+              {editingClass ? "Edit Class" : "Class Management"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+          <Tabs
+            value={mode}
+            onValueChange={(value) => {
+              if (value === "add") {
                 setMode("add");
                 setError("");
                 setSuccess("");
                 setImportFile(null);
                 setImportPreview([]);
                 setImportResult(null);
-              }}
-              className={`px-4 py-2 text-sm font-semibold transition-smooth ${
-                mode === "add"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Add Class
-            </button>
-            <button
-              onClick={() => {
+              } else if (value === "import") {
                 setMode("import");
                 setError("");
                 setSuccess("");
                 resetForm();
-              }}
-              className={`px-4 py-2 text-sm font-semibold transition-smooth ${
-                mode === "import"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Import Classes
-            </button>
-          </div>
-
-          {mode === "add" ? (
-            <>
-              <h2 className="text-lg font-bold text-gray-800 mb-3">
-                {editingClass ? "Edit Class" : "Add Class"}
-              </h2>
-
-              <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                School <span className="text-red-500">*</span>
-              </label>
-              {loadingSchools ? (
-                <div className="flex items-center justify-center py-2">
-                  <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
-                  <span className="ml-2 text-xs text-gray-600">Loading...</span>
-                </div>
-              ) : (
-                <CustomDropdown
-                  options={schools.map((school) => ({
-                    value: school.id.toString(),
-                    label: school.name,
-                  }))}
-                  value={formData.schoolId?.toString() || ""}
-                  onChange={(value) => {
-                    const schoolId = value ? parseInt(value as string) : "";
-                    setFormData({ ...formData, schoolId });
-                    setSelectedSchoolId(schoolId);
-                    setPage(1);
-                  }}
-                  placeholder="Select a school..."
-                  className="w-full"
-                />
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Class Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="e.g., Grade 1"
-                required
-                disabled={!formData.schoolId}
-                className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
-                  !formData.schoolId
-                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                    : "bg-white"
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Description <span className="text-gray-400 text-xs">(Optional)</span>
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Class description..."
-                rows={3}
-                disabled={!formData.schoolId}
-                className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth resize-none ${
-                  !formData.schoolId
-                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                    : "bg-white"
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Status <span className="text-red-500">*</span>
-              </label>
-              <CustomDropdown
-                options={[
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                ]}
-                value={formData.status}
-                onChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    status: value as "active" | "inactive",
-                  })
-                }
-                className="w-full"
-                disabled={!formData.schoolId}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                type="submit"
-                disabled={!formData.schoolId}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold shadow transition-all ${
-                  !formData.schoolId
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
-                }`}
+              }
+            }}
+          >
+            <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-lg border border-gray-200 mb-4">
+              <TabsTrigger
+                value="add"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all font-semibold"
               >
-                {editingClass ? "Update" : "Create"}
-              </button>
-              {editingClass && (
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-smooth"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-            </>
-          ) : (
-            <>
-              <h2 className="text-lg font-bold text-gray-800 mb-3">
-                Import Classes from CSV
-              </h2>
+                Add Class
+              </TabsTrigger>
+              <TabsTrigger
+                value="import"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all font-semibold"
+              >
+                Import Classes
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-              <div className="space-y-4">
-                {/* School Selection for Import */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                    School <span className="text-red-500">*</span>
-                  </label>
-                  {loadingSchools ? (
-                    <div className="flex items-center justify-center py-2">
-                      <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
-                      <span className="ml-2 text-xs text-gray-600">Loading...</span>
-                    </div>
-                  ) : (
-                    <CustomDropdown
-                      options={schools.map((school) => ({
-                        value: school.id.toString(),
-                        label: school.name,
-                      }))}
-                      value={importSchoolId?.toString() || ""}
-                      onChange={(value) => {
-                        const schoolId = value ? parseInt(value as string) : "";
-                        setImportSchoolId(schoolId);
-                        setImportFile(null);
-                        setImportPreview([]);
-                        setImportResult(null);
-                      }}
-                      placeholder="Select a school..."
-                      className="w-full"
-                    />
-                  )}
-                </div>
-
-                {/* Download Sample CSV */}
-                {importSchoolId && (
+          <Tabs
+            value={mode}
+            onValueChange={(value) => setMode(value as "add" | "import")}
+          >
+            <TabsContent value="add" className="mt-0">
+              <>
+                <form onSubmit={handleSubmit} className="space-y-3">
                   <div>
-                    <button
-                      type="button"
-                      onClick={downloadSampleCSV}
-                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition-smooth flex items-center justify-center gap-2"
-                    >
-                      <FiDownload className="w-4 h-4" />
-                      Download Sample CSV
-                    </button>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Download a sample CSV with school ID pre-filled
-                    </p>
-                  </div>
-                )}
-
-                {/* File Upload */}
-                {importSchoolId && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Upload CSV File <span className="text-red-500">*</span>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                      School <span className="text-red-500">*</span>
                     </label>
-                    <div
-                      {...getRootProps()}
-                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-smooth ${
-                        isDragActive
-                          ? "border-indigo-500 bg-indigo-50"
-                          : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
+                    {loadingSchools ? (
+                      <div className="flex items-center justify-center py-2">
+                        <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                        <span className="ml-2 text-xs text-gray-600">
+                          Loading...
+                        </span>
+                      </div>
+                    ) : (
+                      <Select
+                        value={
+                          formData.schoolId && formData.schoolId !== ""
+                            ? formData.schoolId.toString()
+                            : undefined
+                        }
+                        onValueChange={(value) => {
+                          const schoolId = parseInt(value, 10);
+                          setFormData({ ...formData, schoolId });
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a school..." />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {schools.map((school) => (
+                            <SelectItem
+                              key={school.id}
+                              value={school.id.toString()}
+                            >
+                              {school.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                      Class Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      placeholder="e.g., Grade 1"
+                      required
+                      disabled={!formData.schoolId}
+                      className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
+                        !formData.schoolId
+                          ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                          : "bg-white"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                      Description{" "}
+                      <span className="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Class description..."
+                      rows={3}
+                      disabled={!formData.schoolId}
+                      className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth resize-none ${
+                        !formData.schoolId
+                          ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                          : "bg-white"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                      Status <span className="text-red-500">*</span>
+                    </label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          status: value as "active" | "inactive",
+                        })
+                      }
+                      disabled={!formData.schoolId}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={!formData.schoolId}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold shadow transition-all ${
+                        !formData.schoolId
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
                       }`}
                     >
-                      <input {...getInputProps()} />
-                      <FiUpload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                      {importFile ? (
-                        <div>
-                          <p className="text-sm font-semibold text-gray-700">
-                            {importFile.name}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setImportFile(null);
-                              setImportPreview([]);
-                            }}
-                            className="mt-2 text-xs text-red-600 hover:text-red-700"
-                          >
-                            Remove
-                          </button>
-                        </div>
+                      {editingClass ? "Update" : "Create"}
+                    </button>
+                    {editingClass && (
+                      <button
+                        type="button"
+                        onClick={handleCancel}
+                        className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-smooth"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </>
+            </TabsContent>
+            <TabsContent value="import" className="mt-0">
+              <>
+                <div className="space-y-4">
+                  {/* School Selection for Import */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                      School <span className="text-red-500">*</span>
+                    </label>
+                    {loadingSchools ? (
+                      <div className="flex items-center justify-center py-2">
+                        <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
+                        <span className="ml-2 text-xs text-gray-600">
+                          Loading...
+                        </span>
+                      </div>
+                    ) : (
+                      <Select
+                        value={
+                          importSchoolId && importSchoolId !== ""
+                            ? importSchoolId.toString()
+                            : undefined
+                        }
+                        onValueChange={(value) => {
+                          const schoolId = value ? parseInt(value) : "";
+                          setImportSchoolId(schoolId);
+                          setImportFile(null);
+                          setImportPreview([]);
+                          setImportResult(null);
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a school..." />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {schools.map((school) => (
+                            <SelectItem
+                              key={school.id}
+                              value={school.id.toString()}
+                            >
+                              {school.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {/* Download Sample CSV */}
+                  {importSchoolId && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={downloadSampleCSV}
+                        className="w-full px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition-smooth flex items-center justify-center gap-2"
+                      >
+                        <FiDownload className="w-4 h-4" />
+                        Download Sample CSV
+                      </button>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Download a sample CSV with school ID pre-filled
+                      </p>
+                    </div>
+                  )}
+
+                  {/* File Upload */}
+                  {importSchoolId && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
+                        Upload CSV File <span className="text-red-500">*</span>
+                      </label>
+                      <div
+                        {...getRootProps()}
+                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-smooth ${
+                          isDragActive
+                            ? "border-indigo-500 bg-indigo-50"
+                            : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input {...getInputProps()} />
+                        <FiUpload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                        {importFile ? (
+                          <div>
+                            <p className="text-sm font-semibold text-gray-700">
+                              {importFile.name}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImportFile(null);
+                                setImportPreview([]);
+                              }}
+                              className="mt-2 text-xs text-red-600 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-sm text-gray-600">
+                              {isDragActive
+                                ? "Drop your CSV file here"
+                                : "Drag & drop your CSV file here"}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              or click to browse
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Preview */}
+                  {importPreview.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
+                        Preview ({importPreview.length} rows)
+                      </label>
+                      <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-2 py-1 text-left">Name</th>
+                              <th className="px-2 py-1 text-left">
+                                Description
+                              </th>
+                              <th className="px-2 py-1 text-left">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {importPreview.map((row, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="px-2 py-1">{row.name}</td>
+                                <td className="px-2 py-1">
+                                  {row.description || "-"}
+                                </td>
+                                <td className="px-2 py-1">{row.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Import Button */}
+                  {importFile && importSchoolId && (
+                    <button
+                      type="button"
+                      onClick={handleBulkImport}
+                      disabled={isImporting}
+                      className={`w-full px-3 py-2 rounded-lg text-sm font-semibold shadow transition-all ${
+                        isImporting
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
+                      }`}
+                    >
+                      {isImporting ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <FiLoader className="w-4 h-4 animate-spin" />
+                          Importing...
+                        </span>
                       ) : (
-                        <div>
-                          <p className="text-sm text-gray-600">
-                            {isDragActive
-                              ? "Drop your CSV file here"
-                              : "Drag & drop your CSV file here"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            or click to browse
+                        "Import Classes"
+                      )}
+                    </button>
+                  )}
+
+                  {/* Import Results */}
+                  {importResult && (
+                    <div className="space-y-2">
+                      {importResult.success > 0 && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-sm font-semibold text-green-800">
+                            Successfully imported: {importResult.success}{" "}
+                            class(es)
                           </p>
                         </div>
                       )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Preview */}
-                {importPreview.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Preview ({importPreview.length} rows)
-                    </label>
-                    <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-1 text-left">Name</th>
-                            <th className="px-2 py-1 text-left">Description</th>
-                            <th className="px-2 py-1 text-left">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {importPreview.map((row, idx) => (
-                            <tr key={idx} className="border-t">
-                              <td className="px-2 py-1">{row.name}</td>
-                              <td className="px-2 py-1">{row.description || "-"}</td>
-                              <td className="px-2 py-1">{row.status}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Import Button */}
-                {importFile && importSchoolId && (
-                  <button
-                    type="button"
-                    onClick={handleBulkImport}
-                    disabled={isImporting}
-                    className={`w-full px-3 py-2 rounded-lg text-sm font-semibold shadow transition-all ${
-                      isImporting
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
-                    }`}
-                  >
-                    {isImporting ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <FiLoader className="w-4 h-4 animate-spin" />
-                        Importing...
-                      </span>
-                    ) : (
-                      "Import Classes"
-                    )}
-                  </button>
-                )}
-
-                {/* Import Results */}
-                {importResult && (
-                  <div className="space-y-2">
-                    {importResult.success > 0 && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm font-semibold text-green-800">
-                          Successfully imported: {importResult.success} class(es)
-                        </p>
-                      </div>
-                    )}
-                    {importResult.skipped > 0 && (
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm font-semibold text-yellow-800 mb-2">
-                          Skipped (duplicates): {importResult.skipped} class(es)
-                        </p>
-                        <div className="max-h-32 overflow-y-auto text-xs text-yellow-700">
-                          {importResult.duplicates.map((dup, idx) => (
-                            <div key={idx} className="mb-1">
-                              Row {dup.row} - "{dup.name}": {dup.reason}
-                            </div>
-                          ))}
+                      {importResult.skipped > 0 && (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm font-semibold text-yellow-800 mb-2">
+                            Skipped (duplicates): {importResult.skipped}{" "}
+                            class(es)
+                          </p>
+                          <div className="max-h-32 overflow-y-auto text-xs text-yellow-700">
+                            {importResult.duplicates.map((dup, idx) => (
+                              <div key={idx} className="mb-1">
+                                Row {dup.row} - "{dup.name}": {dup.reason}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {importResult.failed > 0 && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm font-semibold text-red-800 mb-2">
-                          Failed: {importResult.failed} class(es)
-                        </p>
-                        <div className="max-h-32 overflow-y-auto text-xs text-red-700">
-                          {importResult.errors.map((err, idx) => (
-                            <div key={idx} className="mb-1">
-                              Row {err.row}: {err.error}
-                            </div>
-                          ))}
+                      )}
+                      {importResult.failed > 0 && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm font-semibold text-red-800 mb-2">
+                            Failed: {importResult.failed} class(es)
+                          </p>
+                          <div className="max-h-32 overflow-y-auto text-xs text-red-700">
+                            {importResult.errors.map((err, idx) => (
+                              <div key={idx} className="mb-1">
+                                Row {err.row}: {err.error}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            </TabsContent>
+          </Tabs>
+          </CardContent>
+        </Card>
 
         {/* Right Side - Listing */}
-        <div className="card-modern rounded-xl p-4 lg:col-span-2">
-          {/* Filters */}
-          <div className="mb-4 space-y-3">
+        <Card className="lg:col-span-2">
+          <CardContent className="pt-6">
+            {/* Filters */}
+            <div className="mb-4 space-y-3">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1">
                 <div className="relative">
@@ -910,19 +948,29 @@ export default function Classes() {
                 </div>
               </div>
               <div className="w-full sm:w-64">
-                <CustomDropdown
-                  options={schools.map((school) => ({
-                    value: school.id.toString(),
-                    label: school.name,
-                  }))}
-                  value={selectedSchoolId?.toString() || ""}
-                  onChange={(value) => {
-                    setSelectedSchoolId(value ? parseInt(value as string) : "");
+                <Select
+                  value={
+                    selectedSchoolId ? selectedSchoolId.toString() : "__EMPTY__"
+                  }
+                  onValueChange={(value) => {
+                    setSelectedSchoolId(
+                      value === "__EMPTY__" ? "" : parseInt(value)
+                    );
                     setPage(1);
                   }}
-                  placeholder="Filter by school..."
-                  className="w-full"
-                />
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filter by school..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="__EMPTY__">All Schools</SelectItem>
+                    {schools.map((school) => (
+                      <SelectItem key={school.id} value={school.id.toString()}>
+                        {school.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -931,11 +979,6 @@ export default function Classes() {
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <FiLoader className="w-8 h-8 animate-spin text-indigo-600" />
-            </div>
-          ) : !selectedSchoolId ? (
-            <div className="text-center py-12">
-              <FiBook className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">Please select a school to view classes</p>
             </div>
           ) : classes.length === 0 ? (
             <div className="text-center py-12">
@@ -954,6 +997,9 @@ export default function Classes() {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         Class Name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        School
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         Description
@@ -978,8 +1024,16 @@ export default function Classes() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
+                          {classItem.school?.name ||
+                            schools.find((s) => s.id === classItem.schoolId)
+                              ?.name ||
+                            `School ID: ${classItem.schoolId}`}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
                           {classItem.description || (
-                            <span className="text-gray-400 italic">No description</span>
+                            <span className="text-gray-400 italic">
+                              No description
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -1035,9 +1089,9 @@ export default function Classes() {
               />
             </>
           )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
-

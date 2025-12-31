@@ -24,6 +24,23 @@ import {
   FiTag,
   FiBook,
 } from "react-icons/fi";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
 
 interface LayoutProps {
   children: ReactNode;
@@ -45,8 +62,7 @@ export default function Layout({ children }: LayoutProps) {
     analytics: false,
     reports: false,
   });
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
+  // Note: showUserMenu and showNotifications removed - now using DropdownMenu components
   const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{
     top: number;
@@ -159,18 +175,18 @@ export default function Layout({ children }: LayoutProps) {
               icon: FiTag,
             },
             {
-              name: "Fee Heading",
+              name: "Fee Headings",
               path: "/super-admin/settings/fee-settings/fee-heading",
               icon: FiDollarSign,
             },
             {
-              name: "Fee Plan",
+              name: "Fee Plans",
               path: "/super-admin/settings/fee-settings/fee-plan",
               icon: FiCreditCard,
             },
             {
-              name: "Route Plan",
-              path: "/super-admin/settings/fee-settings/fee-heads/route-plan",
+              name: "Route Plans",
+              path: "/super-admin/settings/fee-settings/route-plan",
               icon: FiMapPin,
             },
           ],
@@ -181,7 +197,7 @@ export default function Layout({ children }: LayoutProps) {
           section: "academics",
           children: [
             {
-              name: "Class",
+              name: "Classes",
               path: "/super-admin/settings/academics/class",
               icon: FiBook,
             },
@@ -223,34 +239,74 @@ export default function Layout({ children }: LayoutProps) {
     };
   }, []);
 
-  // Helper function to recursively check if any child is active
-  const hasActiveChildRecursive = (children: any[]): boolean => {
-    return children.some((child) => {
+  // Helper function to recursively check if any child is active and collect nested sections
+  const hasActiveChildRecursive = (
+    children: Array<{
+      path?: string;
+      section?: string;
+      children?: Array<{ path?: string; section?: string; children?: any[] }>;
+    }>,
+    nestedSections: Set<string> = new Set()
+  ): { hasActive: boolean; nestedSections: Set<string> } => {
+    let hasActive = false;
+
+    for (const child of children) {
       if (child.path && isActive(child.path)) {
-        return true;
+        hasActive = true;
       }
-      if (child.children) {
-        return hasActiveChildRecursive(child.children);
+      // If this child has a section property, check if it has active children
+      if (child.section) {
+        nestedSections.add(child.section);
+        // Recursively check nested children to see if this nested section should be expanded
+        if (child.children) {
+          const nestedResult = hasActiveChildRecursive(
+            child.children,
+            nestedSections
+          );
+          // If nested children are active, mark this nested section for expansion
+          if (nestedResult.hasActive) {
+            hasActive = true;
+          }
+        }
+      } else if (child.children) {
+        const result = hasActiveChildRecursive(child.children, nestedSections);
+        hasActive = hasActive || result.hasActive;
       }
-      return false;
-    });
+    }
+
+    return { hasActive, nestedSections };
   };
 
   // Auto-expand only the active section, collapse all others
   useEffect(() => {
     if (isSuperAdmin) {
       const newExpandedSections: Record<string, boolean> = {};
+      const nestedSectionsToExpand = new Set<string>();
 
       superAdminSections.forEach((section) => {
         if (section.section && section.children) {
           // Recursively check if any child (at any level) is active
-          const hasActive = hasActiveChildRecursive(section.children);
+          const { hasActive, nestedSections } = hasActiveChildRecursive(
+            section.children
+          );
           // Only expand the section that has an active child, collapse all others
           newExpandedSections[section.section] = hasActive;
+
+          // If this section has active children, also expand its nested sections
+          if (hasActive) {
+            nestedSections.forEach((nestedSection) => {
+              nestedSectionsToExpand.add(nestedSection);
+            });
+          }
         }
       });
 
-      // Update all sections at once - collapse inactive ones, expand active one
+      // Expand nested sections that have active children
+      nestedSectionsToExpand.forEach((nestedSection) => {
+        newExpandedSections[nestedSection] = true;
+      });
+
+      // Update all sections at once - collapse inactive ones, expand active ones
       setExpandedSections((prev) => ({
         ...prev,
         ...newExpandedSections,
@@ -263,7 +319,7 @@ export default function Layout({ children }: LayoutProps) {
   const regularNavigation = [
     {
       name: "Dashboard",
-      path: "/dashboard",
+      path: "/super-admin/dashboard",
       icon: FiHome,
       roles: ["administrator", "accountant"],
     },
@@ -371,26 +427,31 @@ export default function Layout({ children }: LayoutProps) {
               });
               const isDashboardActive = section.path && isActive(section.path);
 
-              // Dashboard (no children)
+              // Dashboard (no children) - Using shadcn/ui Button
               if (!section.children) {
                 return (
-                  <Link
+                  <Button
                     key={section.path}
-                    to={section.path!}
-                    className={`${
+                    asChild
+                    variant={isDashboardActive ? "default" : "ghost"}
+                    className={`w-full justify-start ${
                       isDashboardActive
-                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg"
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:from-indigo-700 hover:to-purple-700"
                         : "text-gray-700 hover:bg-gray-100"
-                    } flex items-center px-3 py-2 rounded-lg transition-smooth text-sm relative`}
+                    } relative`}
                   >
-                    {isDashboardActive && (
-                      <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-white/80 rounded-r-full" />
-                    )}
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                    {sidebarOpen && (
-                      <span className="ml-2.5 font-medium">{section.name}</span>
-                    )}
-                  </Link>
+                    <Link to={section.path!}>
+                      {isDashboardActive && (
+                        <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-white/80 rounded-r-full" />
+                      )}
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {sidebarOpen && (
+                        <span className="ml-2.5 font-medium">
+                          {section.name}
+                        </span>
+                      )}
+                    </Link>
+                  </Button>
                 );
               }
 
@@ -438,48 +499,54 @@ export default function Layout({ children }: LayoutProps) {
                   }}
                 >
                   {sidebarOpen ? (
-                    <>
-                      <button
-                        onClick={() =>
-                          section.section && toggleSection(section.section)
-                        }
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-smooth text-sm relative ${
-                          hasActiveChild
-                            ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 font-semibold"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
-                      >
-                        {hasActiveChild && (
-                          <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
-                        )}
-                        <div className="flex items-center">
-                          <Icon
-                            className={`w-4 h-4 flex-shrink-0 ${
-                              hasActiveChild ? "text-indigo-600" : ""
-                            }`}
-                          />
-                          <span className="ml-2.5 font-semibold">
-                            {section.name}
-                          </span>
-                        </div>
-                        {section.children && (
-                          <div
-                            className={hasActiveChild ? "text-indigo-600" : ""}
-                          >
-                            {isExpanded ? (
-                              <FiChevronDown className="w-3.5 h-3.5" />
-                            ) : (
-                              <FiChevronRight className="w-3.5 h-3.5" />
-                            )}
+                    <Collapsible
+                      open={isExpanded}
+                      onOpenChange={() =>
+                        section.section && toggleSection(section.section)
+                      }
+                    >
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className={`w-full justify-between ${
+                            hasActiveChild
+                              ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 font-semibold hover:from-indigo-100 hover:to-purple-100"
+                              : "text-gray-700 hover:bg-gray-100"
+                          } relative`}
+                        >
+                          {hasActiveChild && (
+                            <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
+                          )}
+                          <div className="flex items-center">
+                            <Icon
+                              className={`w-4 h-4 flex-shrink-0 ${
+                                hasActiveChild ? "text-indigo-600" : ""
+                              }`}
+                            />
+                            <span className="ml-2.5 font-semibold">
+                              {section.name}
+                            </span>
                           </div>
-                        )}
-                      </button>
-
-                      {isExpanded && section.children && (
+                          {section.children && (
+                            <div
+                              className={
+                                hasActiveChild ? "text-indigo-600" : ""
+                              }
+                            >
+                              {isExpanded ? (
+                                <FiChevronDown className="w-3.5 h-3.5" />
+                              ) : (
+                                <FiChevronRight className="w-3.5 h-3.5" />
+                              )}
+                            </div>
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
                         <div className="ml-6 mt-1 space-y-0.5">
                           {section.children.map((child) => {
                             const ChildIcon = child.icon;
-                            // Check if child has nested children
+                            // Check if child has nested children - Using shadcn/ui Collapsible
                             if (child.children && child.section) {
                               const isChildExpanded =
                                 expandedSections[child.section] ?? false;
@@ -490,48 +557,52 @@ export default function Layout({ children }: LayoutProps) {
                                     : false
                               );
                               return (
-                                <div
+                                <Collapsible
                                   key={child.section}
+                                  open={isChildExpanded}
+                                  onOpenChange={() =>
+                                    child.section &&
+                                    toggleSection(child.section)
+                                  }
                                   className="space-y-0.5"
                                 >
-                                  <button
-                                    onClick={() =>
-                                      child.section &&
-                                      toggleSection(child.section)
-                                    }
-                                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md transition-smooth text-xs relative ${
-                                      hasActiveGrandchild
-                                        ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 font-semibold"
-                                        : "text-gray-600 hover:bg-gray-50"
-                                    }`}
-                                  >
-                                    {hasActiveGrandchild && (
-                                      <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
-                                    )}
-                                    <div className="flex items-center">
-                                      <ChildIcon
-                                        className={`w-3.5 h-3.5 mr-2 ${
-                                          hasActiveGrandchild
-                                            ? "text-indigo-600"
-                                            : ""
-                                        }`}
-                                      />
-                                      <span>{child.name}</span>
-                                    </div>
-                                    {isChildExpanded ? (
-                                      <FiChevronDown className="w-3 h-3" />
-                                    ) : (
-                                      <FiChevronRight className="w-3 h-3" />
-                                    )}
-                                  </button>
-                                  {isChildExpanded && child.children && (
+                                  <CollapsibleTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      className={`w-full justify-between px-3 py-1.5 h-auto text-xs relative ${
+                                        hasActiveGrandchild
+                                          ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 font-semibold hover:from-indigo-100 hover:to-purple-100"
+                                          : "text-gray-600 hover:bg-gray-50"
+                                      }`}
+                                    >
+                                      {hasActiveGrandchild && (
+                                        <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
+                                      )}
+                                      <div className="flex items-center">
+                                        <ChildIcon
+                                          className={`w-3.5 h-3.5 mr-2 ${
+                                            hasActiveGrandchild
+                                              ? "text-indigo-600"
+                                              : ""
+                                          }`}
+                                        />
+                                        <span>{child.name}</span>
+                                      </div>
+                                      {isChildExpanded ? (
+                                        <FiChevronDown className="w-3 h-3" />
+                                      ) : (
+                                        <FiChevronRight className="w-3 h-3" />
+                                      )}
+                                    </Button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
                                     <div className="ml-4 mt-0.5 space-y-0.5">
                                       {child.children.map((grandchild) => {
                                         if (
                                           grandchild.children &&
                                           grandchild.section
                                         ) {
-                                          // Handle 4th level if needed
+                                          // Handle 4th level - Using shadcn/ui Collapsible
                                           const isGrandchildExpanded =
                                             expandedSections[
                                               grandchild.section
@@ -542,128 +613,145 @@ export default function Layout({ children }: LayoutProps) {
                                                 ? isActive(ggc.path)
                                                 : false
                                             );
+                                          const GrandchildIcon =
+                                            grandchild.icon;
                                           return (
-                                            <div
+                                            <Collapsible
                                               key={grandchild.section}
+                                              open={isGrandchildExpanded}
+                                              onOpenChange={() =>
+                                                grandchild.section &&
+                                                toggleSection(
+                                                  grandchild.section
+                                                )
+                                              }
                                               className="space-y-0.5"
                                             >
-                                              <button
-                                                onClick={() =>
-                                                  grandchild.section &&
-                                                  toggleSection(
-                                                    grandchild.section
-                                                  )
-                                                }
-                                                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md transition-smooth text-xs relative ${
-                                                  hasActiveGreatGrandchild
-                                                    ? "bg-indigo-50 text-indigo-700 font-medium"
-                                                    : "text-gray-600 hover:bg-gray-50"
-                                                }`}
-                                              >
-                                                <div className="flex items-center">
-                                                  <grandchild.icon className="w-3 h-3 mr-2" />
-                                                  <span>{grandchild.name}</span>
-                                                </div>
-                                                {isGrandchildExpanded ? (
-                                                  <FiChevronDown className="w-2.5 h-2.5" />
-                                                ) : (
-                                                  <FiChevronRight className="w-2.5 h-2.5" />
-                                                )}
-                                              </button>
-                                              {isGrandchildExpanded &&
-                                                grandchild.children && (
-                                                  <div className="ml-4 mt-0.5 space-y-0.5">
-                                                    {grandchild.children.map(
-                                                      (ggc) => {
-                                                        const GGCIcon =
-                                                          ggc.icon;
-                                                        const isGGCActive =
-                                                          ggc.path
-                                                            ? isActive(ggc.path)
-                                                            : false;
-                                                        return (
-                                                          <Link
-                                                            key={ggc.path}
-                                                            to={ggc.path!}
-                                                            className={`${
-                                                              isGGCActive
-                                                                ? "bg-indigo-100 text-indigo-700 font-medium"
-                                                                : "text-gray-600 hover:bg-gray-50"
-                                                            } flex items-center px-3 py-1 rounded-md transition-smooth text-xs`}
-                                                          >
+                                              <CollapsibleTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  className={`w-full justify-between px-3 py-1.5 h-auto text-xs relative ${
+                                                    hasActiveGreatGrandchild
+                                                      ? "bg-indigo-50 text-indigo-700 font-medium hover:bg-indigo-100"
+                                                      : "text-gray-600 hover:bg-gray-50"
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center">
+                                                    <GrandchildIcon className="w-3 h-3 mr-2" />
+                                                    <span>
+                                                      {grandchild.name}
+                                                    </span>
+                                                  </div>
+                                                  {isGrandchildExpanded ? (
+                                                    <FiChevronDown className="w-2.5 h-2.5" />
+                                                  ) : (
+                                                    <FiChevronRight className="w-2.5 h-2.5" />
+                                                  )}
+                                                </Button>
+                                              </CollapsibleTrigger>
+                                              <CollapsibleContent>
+                                                <div className="ml-4 mt-0.5 space-y-0.5">
+                                                  {grandchild.children.map(
+                                                    (ggc) => {
+                                                      const GGCIcon = ggc.icon;
+                                                      const isGGCActive =
+                                                        ggc.path
+                                                          ? isActive(ggc.path)
+                                                          : false;
+                                                      return (
+                                                        <Button
+                                                          key={ggc.path}
+                                                          asChild
+                                                          variant="ghost"
+                                                          className={`w-full justify-start px-3 py-1 h-auto text-xs ${
+                                                            isGGCActive
+                                                              ? "bg-indigo-100 text-indigo-700 font-medium"
+                                                              : "text-gray-600 hover:bg-gray-50"
+                                                          }`}
+                                                        >
+                                                          <Link to={ggc.path!}>
                                                             <GGCIcon className="w-3 h-3 mr-2" />
                                                             {ggc.name}
                                                           </Link>
-                                                        );
-                                                      }
-                                                    )}
-                                                  </div>
-                                                )}
-                                            </div>
+                                                        </Button>
+                                                      );
+                                                    }
+                                                  )}
+                                                </div>
+                                              </CollapsibleContent>
+                                            </Collapsible>
                                           );
                                         }
-                                        // Regular grandchild with path
+                                        // Regular grandchild with path - Using shadcn/ui Button
                                         const GrandchildIcon = grandchild.icon;
                                         const isGrandchildActive =
                                           grandchild.path
                                             ? isActive(grandchild.path)
                                             : false;
                                         return (
-                                          <Link
+                                          <Button
                                             key={grandchild.path}
-                                            to={grandchild.path!}
-                                            className={`${
+                                            asChild
+                                            variant="ghost"
+                                            className={`w-full justify-start px-3 py-1 h-auto text-xs ${
                                               isGrandchildActive
                                                 ? "bg-indigo-100 text-indigo-700 font-medium"
                                                 : "text-gray-600 hover:bg-gray-50"
-                                            } flex items-center px-3 py-1 rounded-md transition-smooth text-xs`}
+                                            }`}
                                           >
-                                            <GrandchildIcon className="w-3 h-3 mr-2" />
-                                            {grandchild.name}
-                                          </Link>
+                                            <Link to={grandchild.path!}>
+                                              <GrandchildIcon className="w-3 h-3 mr-2" />
+                                              {grandchild.name}
+                                            </Link>
+                                          </Button>
                                         );
                                       })}
                                     </div>
-                                  )}
-                                </div>
+                                  </CollapsibleContent>
+                                </Collapsible>
                               );
                             }
-                            // Regular child with path
+                            // Regular child with path - Using shadcn/ui Button
                             const isChildActive = child.path
                               ? isActive(child.path)
                               : false;
                             return (
-                              <Link
+                              <Button
                                 key={child.path}
-                                to={child.path!}
-                                className={`${
+                                asChild
+                                variant="ghost"
+                                className={`w-full justify-start px-3 py-1.5 h-auto text-xs relative ${
                                   isChildActive
                                     ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 font-semibold shadow-sm"
                                     : "text-gray-600 hover:bg-gray-50"
-                                } flex items-center px-3 py-1.5 rounded-md transition-smooth text-xs relative`}
+                                }`}
                               >
-                                {isChildActive && (
-                                  <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
-                                )}
-                                <ChildIcon
-                                  className={`w-3.5 h-3.5 mr-2 ${
-                                    isChildActive ? "text-indigo-600" : ""
-                                  }`}
-                                />
-                                {child.name}
-                              </Link>
+                                <Link to={child.path!}>
+                                  {isChildActive && (
+                                    <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-indigo-500 rounded-r-full" />
+                                  )}
+                                  <ChildIcon
+                                    className={`w-3.5 h-3.5 mr-2 ${
+                                      isChildActive ? "text-indigo-600" : ""
+                                    }`}
+                                  />
+                                  {child.name}
+                                </Link>
+                              </Button>
                             );
                           })}
                         </div>
-                      )}
-                    </>
+                      </CollapsibleContent>
+                    </Collapsible>
                   ) : (
                     <>
-                      {/* Collapsed: Show icon button */}
-                      <button
-                        className={`w-full flex items-center justify-center px-3 py-2 rounded-lg transition-smooth text-sm relative ${
+                      {/* Collapsed: Show icon button - Using shadcn/ui Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`w-full relative ${
                           hasActiveChild
-                            ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700"
+                            ? "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100"
                             : "text-gray-700 hover:bg-gray-100"
                         }`}
                         title={section.name}
@@ -676,7 +764,7 @@ export default function Layout({ children }: LayoutProps) {
                             hasActiveChild ? "text-indigo-600" : ""
                           }`}
                         />
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
@@ -756,24 +844,26 @@ export default function Layout({ children }: LayoutProps) {
               );
             })()}
 
-          {/* Sidebar Footer - Only show when open */}
+          {/* Sidebar Footer - Only show when open - Using shadcn/ui Card */}
           {sidebarOpen && (
             <div className="p-3 border-t border-gray-200">
-              <div className="px-3 py-2 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <div className="w-7 h-7 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-md">
-                    <FiUser className="w-3.5 h-3.5 text-white" />
+              <Card className="border-0 shadow-none bg-gray-50">
+                <CardContent className="p-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-md">
+                      <FiUser className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-900 truncate">
+                        {user?.name}
+                      </p>
+                      <p className="text-[10px] text-gray-500 capitalize">
+                        {user?.role?.replace("_", " ")}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-900 truncate">
-                      {user?.name}
-                    </p>
-                    <p className="text-[10px] text-gray-500 capitalize">
-                      {user?.role?.replace("_", " ")}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </aside>
@@ -796,130 +886,95 @@ export default function Layout({ children }: LayoutProps) {
                 <div className="flex-1" /> {/* Spacer */}
                 {/* Right Side: Notifications & User Menu */}
                 <div className="flex items-center gap-2">
-                  {/* Notifications */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowNotifications(!showNotifications);
-                        setShowUserMenu(false);
-                      }}
-                      className="relative p-2 hover:bg-gray-100 rounded-lg transition-smooth"
-                      title="Notifications"
-                    >
-                      <FiBell className="w-5 h-5 text-gray-600" />
-                      {/* Notification Badge */}
-                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                    </button>
-
-                    {/* Notifications Dropdown */}
-                    {showNotifications && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setShowNotifications(false)}
-                        />
-                        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                          <div className="p-4 border-b border-gray-200">
-                            <h3 className="text-sm font-semibold text-gray-900">
-                              Notifications
-                            </h3>
-                          </div>
-                          <div className="max-h-96 overflow-y-auto">
-                            <div className="p-4 text-center text-sm text-gray-500">
-                              No new notifications
-                            </div>
-                          </div>
+                  {/* Notifications - Using shadcn/ui DropdownMenu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="relative p-2 hover:bg-gray-100 rounded-lg transition-smooth"
+                        title="Notifications"
+                      >
+                        <FiBell className="w-5 h-5 text-gray-600" />
+                        <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-destructive text-destructive-foreground border-2 border-white">
+                          <span className="text-[8px]">!</span>
+                        </Badge>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-80">
+                      <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                      <Separator />
+                      <div className="max-h-96 overflow-y-auto">
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          No new notifications
                         </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* User Menu */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(!showUserMenu);
-                        setShowNotifications(false);
-                      }}
-                      className="flex items-center gap-2 px-3 py-1 hover:bg-gray-100 rounded-lg transition-smooth"
-                    >
-                      <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-md">
-                        <FiUser className="w-4 h-4 text-white" />
                       </div>
-                      <div className="hidden md:block text-left">
-                        <p className="text-sm font-medium text-gray-900">
-                          {user?.name}
-                        </p>
-                        <p className="text-xs text-gray-500 capitalize">
-                          {user?.role?.replace("_", " ")}
-                        </p>
-                      </div>
-                      <FiChevronUp
-                        className={`w-4 h-4 text-gray-500 transition-transform ${
-                          showUserMenu ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                    {/* User Dropdown Menu */}
-                    {showUserMenu && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setShowUserMenu(false)}
-                        />
-                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                          <div className="p-4 border-b border-gray-200">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {user?.name}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {user?.email}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1 capitalize">
-                              {user?.role?.replace("_", " ")}
-                            </p>
-                          </div>
-                          <div className="py-2">
-                            <Link
-                              to={
-                                user?.role === "super_admin"
-                                  ? "/super-admin/profile"
-                                  : "/profile"
-                              }
-                              onClick={() => setShowUserMenu(false)}
-                              className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-smooth"
-                            >
-                              <FiUser className="w-4 h-4" />
-                              <span>Profile</span>
-                            </Link>
-                            {user?.role === "super_admin" && (
-                              <Link
-                                to="/super-admin/settings"
-                                onClick={() => setShowUserMenu(false)}
-                                className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-smooth"
-                              >
-                                <FiSettings className="w-4 h-4" />
-                                <span>Settings</span>
-                              </Link>
-                            )}
-                          </div>
-                          <div className="border-t border-gray-200 py-2">
-                            <button
-                              onClick={() => {
-                                setShowUserMenu(false);
-                                handleLogout();
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-smooth"
-                            >
-                              <FiLogOut className="w-4 h-4" />
-                              <span>Logout</span>
-                            </button>
-                          </div>
+                  {/* User Menu - Using shadcn/ui DropdownMenu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-2 px-3 py-1 hover:bg-gray-100 rounded-lg transition-smooth">
+                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-md">
+                          <FiUser className="w-4 h-4 text-white" />
                         </div>
-                      </>
-                    )}
-                  </div>
+                        <div className="hidden md:block text-left">
+                          <p className="text-sm font-medium text-gray-900">
+                            {user?.name}
+                          </p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            {user?.role?.replace("_", " ")}
+                          </p>
+                        </div>
+                        <FiChevronUp className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>
+                        <div>
+                          <p className="text-sm font-semibold">{user?.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {user?.email}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 capitalize">
+                            {user?.role?.replace("_", " ")}
+                          </p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to={
+                            user?.role === "super_admin"
+                              ? "/super-admin/profile"
+                              : "/profile"
+                          }
+                          className="flex items-center gap-3 cursor-pointer"
+                        >
+                          <FiUser className="w-4 h-4" />
+                          <span>Profile</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      {user?.role === "super_admin" && (
+                        <DropdownMenuItem asChild>
+                          <Link
+                            to="/super-admin/settings"
+                            className="flex items-center gap-3 cursor-pointer"
+                          >
+                            <FiSettings className="w-4 h-4" />
+                            <span>Settings</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={handleLogout}
+                        className="text-destructive focus:text-destructive cursor-pointer"
+                      >
+                        <FiLogOut className="w-4 h-4 mr-3" />
+                        <span>Logout</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>

@@ -1,26 +1,38 @@
-import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { FiMail, FiLock, FiLoader, FiDollarSign } from 'react-icons/fi';
+import { useState, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { FiMail, FiLock, FiLoader, FiDollarSign } from "react-icons/fi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await login({ email, password });
-      navigate('/dashboard');
+      navigate("/super-admin/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setError(
+        err.response?.data?.message || "Login failed. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -37,72 +49,96 @@ export default function Login() {
           <h2 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
             Welcome back
           </h2>
-          <p className="mt-2 text-sm text-gray-600">Sign in to your School ERP Platform</p>
+          <p className="mt-2 text-sm text-gray-600">
+            Sign in to your School ERP Platform
+          </p>
         </div>
 
-        {/* Login Form */}
-        <div className="card-modern rounded-2xl p-8 animate-fade-in">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg animate-pulse-slow">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-sm text-red-700">{error}</p>
+        {/* Login Form - Using shadcn/ui Card */}
+        <Card className="rounded-2xl shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">Sign in to your account</CardTitle>
+            <CardDescription>
+              Enter your credentials to access the School ERP Platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              {error && (
+                <div className="bg-destructive/10 border-l-4 border-destructive p-4 rounded-r-lg animate-pulse-slow">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className="w-5 h-5 text-destructive"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
+                  Email address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FiMail className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className="pl-10"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
                 </div>
               </div>
-            )}
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiMail className="h-5 w-5 text-gray-400" />
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FiLock className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    className="pl-10"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
                 </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiLock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-smooth hover-lift"
+                className="w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
               >
                 {loading ? (
                   <>
@@ -110,26 +146,24 @@ export default function Login() {
                     Signing in...
                   </>
                 ) : (
-                  'Sign in'
+                  "Sign in"
                 )}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6 text-center space-y-2">
-            <p className="text-xs text-gray-500">
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-2">
+            <p className="text-xs text-muted-foreground">
               Demo credentials: admin@example.com / admin123
             </p>
-            <div>
-              <button
-                onClick={() => navigate('/register')}
-                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-              >
-                Don't have an account? Register here
-              </button>
-            </div>
-          </div>
-        </div>
+            <Button
+              variant="link"
+              onClick={() => navigate("/register")}
+              className="text-sm"
+            >
+              Don't have an account? Register here
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );

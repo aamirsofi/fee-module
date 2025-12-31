@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import Modal from '../components/Modal';
 import { studentsService } from '../services/students.service';
-import { useAuth } from '../contexts/AuthContext';
 import { Student } from '../types';
 import { FiPlus, FiEdit2, FiTrash2, FiUser, FiMail, FiBook, FiLoader } from 'react-icons/fi';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 export default function Students() {
-  const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -74,11 +76,7 @@ export default function Students() {
       setError(errorMessage);
       
       // If error mentions school context, provide helpful guidance
-      if (errorMessage.includes('School context') || errorMessage.includes('school')) {
-        console.error('School context error:', errorMessage);
-        console.log('User object:', JSON.parse(localStorage.getItem('user') || '{}'));
-        console.log('School subdomain:', localStorage.getItem('school_subdomain'));
-      }
+      // Error message is already displayed to user via setError()
       
       // Don't close modal on error so user can fix and retry
     }
@@ -128,82 +126,92 @@ export default function Students() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="card-modern rounded-2xl shadow-lg p-6 animate-fade-in">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                Students
-              </h1>
-              <p className="mt-1 text-sm text-gray-600">Manage student information and records</p>
-            </div>
-            <button
-              onClick={() => {
-                setEditingStudent(null);
-                resetForm();
-                setError(''); // Clear error when opening modal
-                setShowModal(true);
-              }}
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-smooth hover-lift font-medium"
-            >
-              <FiPlus className="w-5 h-5 mr-2" />
-              Add Student
-            </button>
-          </div>
-        </div>
-
-        {/* Error Alert - Only show if modal is not open (for load/delete errors) */}
-        {error && !showModal && (
-          <div className="card-modern rounded-xl border-l-4 border-red-400 p-4 animate-pulse-slow">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-red-700 mb-1">Error</p>
-                <p className="text-sm text-red-600">{error}</p>
-                {error.includes('School context') && (
-                  <div className="mt-3 text-xs text-red-500">
-                    <p className="font-semibold mb-1">To fix this:</p>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>Ensure your user account has a school assigned</li>
-                      <li>Or access the application via school subdomain (e.g., school1.localhost:5173)</li>
-                      <li>If you're a super admin, create a school first and assign it to your account</li>
-                    </ul>
-                  </div>
-                )}
+        {/* Header - Using shadcn/ui Card */}
+        <Card className="shadow-lg">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+                  Students
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Manage student information and records
+                </CardDescription>
               </div>
+              <Button
+                onClick={() => {
+                  setEditingStudent(null);
+                  resetForm();
+                  setError(''); // Clear error when opening modal
+                  setShowModal(true);
+                }}
+                className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
+              >
+                <FiPlus className="w-5 h-5 mr-2" />
+                Add Student
+              </Button>
             </div>
-          </div>
+          </CardHeader>
+        </Card>
+
+        {/* Error Alert - Only show if modal is not open (for load/delete errors) - Using shadcn/ui Card */}
+        {error && !showModal && (
+          <Card className="border-destructive border-l-4 animate-pulse-slow">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-destructive mb-1">Error</p>
+                  <p className="text-sm text-destructive/90">{error}</p>
+                  {error.includes('School context') && (
+                    <div className="mt-3 text-xs text-destructive/80">
+                      <p className="font-semibold mb-1">To fix this:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>Ensure your user account has a school assigned</li>
+                        <li>Or access the application via school subdomain (e.g., school1.localhost:5173)</li>
+                        <li>If you're a super admin, create a school first and assign it to your account</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Loading State */}
+        {/* Loading State - Using shadcn/ui Card */}
         {loading ? (
-          <div className="card-modern rounded-2xl shadow-lg p-12 flex items-center justify-center">
-            <FiLoader className="w-8 h-8 text-indigo-500 animate-spin" />
-            <span className="ml-3 text-gray-600">Loading students...</span>
-          </div>
+          <Card className="p-12">
+            <CardContent className="flex items-center justify-center">
+              <FiLoader className="w-8 h-8 text-primary animate-spin" />
+              <span className="ml-3 text-muted-foreground">Loading students...</span>
+            </CardContent>
+          </Card>
         ) : students.length === 0 ? (
-          <div className="text-center py-12 card-modern rounded-2xl shadow-lg animate-fade-in">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-full mb-4 shadow-lg">
-              <FiUser className="w-10 h-10 text-white" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No students found</h3>
-            <p className="text-gray-500 mb-4">Get started by creating a new student.</p>
-            <button
-              onClick={() => {
-                resetForm();
-                setError(''); // Clear error when opening modal
-                setShowModal(true);
-              }}
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-smooth hover-lift font-medium"
-            >
-              <FiPlus className="w-4 h-4 mr-2" />
-              Add Student
-            </button>
-          </div>
+          <Card className="text-center py-12 animate-fade-in">
+            <CardContent>
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-full mb-4 shadow-lg">
+                <FiUser className="w-10 h-10 text-white" />
+              </div>
+              <CardTitle className="mb-2">No students found</CardTitle>
+              <CardDescription className="mb-4">Get started by creating a new student.</CardDescription>
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setError(''); // Clear error when opening modal
+                  setShowModal(true);
+                }}
+                className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
+              >
+                <FiPlus className="w-4 h-4 mr-2" />
+                Add Student
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="card-modern rounded-2xl shadow-lg overflow-hidden animate-fade-in">
+          <Card className="shadow-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50">
@@ -260,34 +268,45 @@ export default function Students() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full shadow-sm ${
+                        <Badge
+                          variant={
                             student.status === 'active'
-                              ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white'
+                              ? 'default'
                               : student.status === 'graduated'
-                              ? 'bg-gradient-to-r from-blue-400 to-indigo-500 text-white'
-                              : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                          }`}
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                          className={
+                            student.status === 'active'
+                              ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white border-0'
+                              : student.status === 'graduated'
+                              ? 'bg-gradient-to-r from-blue-400 to-indigo-500 text-white border-0'
+                              : ''
+                          }
                         >
                           {student.status}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <button
+                          <Button
                             onClick={() => handleEdit(student)}
-                            className="text-indigo-600 hover:text-indigo-900 p-2 hover:bg-indigo-50 rounded-xl transition-smooth hover-lift shadow-sm hover:shadow-md"
+                            variant="ghost"
+                            size="icon"
+                            className="text-primary hover:text-primary hover:bg-primary/10"
                             title="Edit"
                           >
                             <FiEdit2 className="w-5 h-5" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() => handleDelete(student.id)}
-                            className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-xl transition-smooth hover-lift shadow-sm hover:shadow-md"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             title="Delete"
                           >
                             <FiTrash2 className="w-5 h-5" />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -295,7 +314,7 @@ export default function Students() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Modal */}
@@ -338,12 +357,11 @@ export default function Students() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Student ID *
                 </label>
-                <input
+                <Input
                   type="text"
                   required
                   value={formData.studentId}
                   onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
                   placeholder="STU001"
                 />
               </div>
@@ -366,12 +384,11 @@ export default function Students() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   First Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   required
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
                   placeholder="John"
                 />
               </div>
@@ -379,12 +396,11 @@ export default function Students() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Last Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   required
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
                   placeholder="Doe"
                 />
               </div>
@@ -392,12 +408,11 @@ export default function Students() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-              <input
+              <Input
                 type="email"
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
                 placeholder="john.doe@example.com"
               />
             </div>
@@ -405,22 +420,20 @@ export default function Students() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Class *</label>
-                <input
+                <Input
                   type="text"
                   required
                   value={formData.class}
                   onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
                   placeholder="10th Grade"
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Section</label>
-                <input
+                <Input
                   type="text"
                   value={formData.section}
                   onChange={(e) => setFormData({ ...formData, section: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
                   placeholder="A"
                 />
               </div>
@@ -428,33 +441,32 @@ export default function Students() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
-              <input
+              <Input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white/50 backdrop-blur-sm"
                 placeholder="+1234567890"
               />
             </div>
 
             <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setShowModal(false);
                   setEditingStudent(null);
                   resetForm();
                 }}
-                className="px-6 py-3 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-smooth hover-lift shadow-sm"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-6 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-smooth hover-lift"
+                className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
               >
                 {editingStudent ? 'Update Student' : 'Create Student'}
-              </button>
+              </Button>
             </div>
           </form>
         </Modal>

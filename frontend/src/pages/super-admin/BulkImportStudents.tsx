@@ -1,55 +1,58 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiUpload, FiArrowLeft, FiLoader } from "react-icons/fi";
-import api from "../../services/api";
+import { FiArrowLeft, FiLoader } from "react-icons/fi";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { schoolService, School } from "../../services/schoolService";
 import StudentBulkImport from "../../components/StudentBulkImport";
-import CustomDropdown from "../../components/ui/CustomDropdown";
-
-interface School {
-  id: number;
-  name: string;
-  subdomain: string;
-  status: string;
-}
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function BulkImportStudents() {
   const navigate = useNavigate();
-  const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(null);
-  const [loadingSchools, setLoadingSchools] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    loadSchools();
-  }, []);
-
-  const loadSchools = async () => {
-    try {
-      setLoadingSchools(true);
-      setError("");
-      // Fetch all active schools
-      const allSchools: School[] = [];
-      let page = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        const response = await api.instance.get("/super-admin/schools", {
-          params: { page, limit: 100, status: "active" },
-        });
-        const { data, meta } = response.data;
-        allSchools.push(...data);
-        hasMore = page < meta.totalPages;
-        page++;
+  // Use TanStack Query for schools (using infinite query for pagination)
+  const {
+    data: schoolsData,
+    isLoading: loadingSchools,
+  } = useInfiniteQuery({
+    queryKey: ["schools", "active"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await schoolService.getSchools({
+        page: pageParam,
+        limit: 100,
+        status: "active",
+      });
+      return response;
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.meta && lastPage.meta.hasNextPage) {
+        return lastPage.meta.page + 1;
       }
+      return undefined;
+    },
+    initialPageParam: 1,
+  });
 
-      setSchools(allSchools);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load schools");
-    } finally {
-      setLoadingSchools(false);
-    }
-  };
+  const schools: School[] = useMemo(() => {
+    if (!schoolsData?.pages) return [];
+    return schoolsData.pages.flatMap((page) => page.data || []);
+  }, [schoolsData]);
 
   const handleImportSuccess = () => {
     setSuccess("Students imported successfully!");
@@ -70,94 +73,125 @@ export default function BulkImportStudents() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/super-admin/schools")}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-smooth"
-          >
-            <FiArrowLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-              Bulk Import Students
-            </h1>
-            <p className="text-gray-600 text-sm mt-0.5">
-              Import multiple students from a CSV file
-            </p>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/super-admin/schools")}
+              className="h-auto p-1.5"
+            >
+              <FiArrowLeft className="w-4 h-4 text-gray-600" />
+            </Button>
+            <div>
+              <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+                Bulk Import Students
+              </CardTitle>
+              <CardDescription>
+                Import multiple students from a CSV file
+              </CardDescription>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardHeader>
+      </Card>
 
       {/* Success/Error Messages */}
       {success && (
-        <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
-          <p className="text-green-700">{success}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="pt-6">
+            <p className="text-sm text-green-700">{success}</p>
+          </CardContent>
+        </Card>
       )}
       {error && (
-        <div className="card-modern rounded-xl p-4 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{error}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-sm text-red-700">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* School Selection */}
-      <div className="card-modern rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Select School
-        </h2>
-        {loadingSchools ? (
-          <div className="flex items-center justify-center py-8">
-            <FiLoader className="w-6 h-6 animate-spin text-indigo-600" />
-            <span className="ml-2 text-gray-600">Loading schools...</span>
-          </div>
-        ) : (
-          <div className="max-w-md">
-            <CustomDropdown
-              options={schools.map((school) => ({
-                value: school.id.toString(),
-                label: school.name,
-              }))}
-              value={selectedSchoolId?.toString() || ""}
-              onChange={(value) => setSelectedSchoolId(parseInt(value))}
-              placeholder="Select a school..."
-              className="w-full"
-            />
-            {selectedSchool && (
-              <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-                <p className="text-sm text-gray-600 mb-1">Selected School:</p>
-                <p className="text-lg font-semibold text-indigo-900">
-                  {selectedSchool.name}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Subdomain: {selectedSchool.subdomain}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-gray-800">
+            Select School
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingSchools ? (
+            <div className="flex items-center justify-center py-8">
+              <FiLoader className="w-6 h-6 animate-spin text-indigo-600" />
+              <span className="ml-2 text-gray-600">Loading schools...</span>
+            </div>
+          ) : (
+            <div className="max-w-md space-y-4">
+              <Select
+                value={selectedSchoolId?.toString() || "__EMPTY__"}
+                onValueChange={(value) => {
+                  setSelectedSchoolId(
+                    value === "__EMPTY__" ? null : parseInt(value)
+                  );
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a school..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="__EMPTY__">Select a school...</SelectItem>
+                  {schools.map((school) => (
+                    <SelectItem key={school.id} value={school.id.toString()}>
+                      {school.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedSchool && (
+                <Card className="bg-indigo-50 border-indigo-200">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-gray-600 mb-1">Selected School:</p>
+                    <p className="text-lg font-semibold text-indigo-900">
+                      {selectedSchool.name}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Subdomain: {selectedSchool.subdomain}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Import Component */}
       {selectedSchoolId && (
-        <div className="card-modern rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            Upload CSV File
-          </h2>
-          <StudentBulkImport
-            schoolId={selectedSchoolId}
-            onImportSuccess={handleImportSuccess}
-            onImportError={handleImportError}
-          />
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-800">
+              Upload CSV File
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StudentBulkImport
+              schoolId={selectedSchoolId}
+              onImportSuccess={handleImportSuccess}
+              onImportError={handleImportError}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Instructions */}
-      <div className="card-modern rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          CSV Format Instructions
-        </h2>
-        <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-gray-800">
+            CSV Format Instructions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-2">
               Required Columns:
@@ -225,7 +259,8 @@ STU002,Jane,Smith,jane.smith@example.com,+1234567891,456 Oak Ave,10th Grade,B,ac
             </div>
           </div>
         </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

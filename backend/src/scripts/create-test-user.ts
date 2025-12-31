@@ -12,7 +12,8 @@ async function bootstrap() {
 
   // Get or create a school first
   let school;
-  const schools = await schoolsService.findAll();
+  const schoolsResponse = await schoolsService.findAll(1, 10, false); // Get first page of active schools
+  const schools = schoolsResponse.data || [];
   if (schools.length > 0) {
     school = schools[0];
     console.log(`✅ Using existing school: ${school.name} (ID: ${school.id})`);

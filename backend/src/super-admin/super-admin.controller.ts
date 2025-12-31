@@ -43,6 +43,8 @@ import { CategoryHeadsService } from '../category-heads/category-heads.service';
 import { FeeCategoryType } from '../fee-categories/entities/fee-category.entity';
 import { CreateFeeStructureDto } from '../fee-structures/dto/create-fee-structure.dto';
 import { UpdateFeeStructureDto } from '../fee-structures/dto/update-fee-structure.dto';
+import { CreateRoutePlanDto } from '../route-plans/dto/create-route-plan.dto';
+import { UpdateRoutePlanDto } from '../route-plans/dto/update-route-plan.dto';
 
 @ApiTags('Super Admin')
 @ApiBearerAuth('JWT-auth')
@@ -778,5 +780,129 @@ export class SuperAdminController {
       throw new BadRequestException('schoolId query parameter is required');
     }
     return this.superAdminService.removeFeeStructure(+id, +schoolId);
+  }
+
+  // ========== ROUTE PLANS ==========
+  @Get('route-plans')
+  @ApiOperation({ summary: 'Get all route plans with pagination (Super Admin only)' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, max: 100)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by name or description',
+  })
+  @ApiQuery({ name: 'schoolId', required: false, type: Number, description: 'Filter by school ID' })
+  @ApiQuery({ name: 'routeId', required: false, type: Number, description: 'Filter by route ID' })
+  @ApiQuery({ name: 'feeCategoryId', required: false, type: Number, description: 'Filter by fee category ID' })
+  @ApiQuery({ name: 'categoryHeadId', required: false, type: Number, description: 'Filter by category head ID' })
+  @ApiQuery({ name: 'classId', required: false, type: Number, description: 'Filter by class ID' })
+  @ApiOkResponse({ description: 'Paginated list of route plans' })
+  getAllRoutePlans(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('routeId') routeId?: string,
+    @Query('feeCategoryId') feeCategoryId?: string,
+    @Query('categoryHeadId') categoryHeadId?: string,
+    @Query('classId') classId?: string,
+  ) {
+    return this.superAdminService.getAllRoutePlans(
+      page ? +page : 1,
+      limit ? +limit : 10,
+      search,
+      schoolId ? +schoolId : undefined,
+      routeId ? +routeId : undefined,
+      feeCategoryId ? +feeCategoryId : undefined,
+      categoryHeadId ? +categoryHeadId : undefined,
+      classId ? +classId : undefined,
+    );
+  }
+
+  @Get('route-plans/:id')
+  @ApiOperation({ summary: 'Get route plan by ID (Super Admin only)' })
+  @ApiParam({ name: 'id', description: 'Route plan ID', type: Number })
+  @ApiOkResponse({ description: 'Route plan found' })
+  @ApiResponse({ status: 404, description: 'Route plan not found' })
+  getRoutePlanById(@Param('id') id: string) {
+    return this.superAdminService.getRoutePlanById(+id);
+  }
+
+  @Post('route-plans')
+  @ApiOperation({ summary: 'Create a new route plan (Super Admin only)' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: true,
+    type: Number,
+    description: 'School ID',
+    example: 1,
+  })
+  @ApiOkResponse({ description: 'Route plan created successfully', status: 201 })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 404, description: 'School, route, or fee category not found' })
+  createRoutePlan(
+    @Body() createRoutePlanDto: CreateRoutePlanDto,
+    @Query('schoolId') schoolId: string,
+  ) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId query parameter is required');
+    }
+    return this.superAdminService.createRoutePlan(createRoutePlanDto, +schoolId);
+  }
+
+  @Patch('route-plans/:id')
+  @ApiOperation({ summary: 'Update route plan (Super Admin only)' })
+  @ApiParam({ name: 'id', description: 'Route plan ID', type: Number })
+  @ApiQuery({
+    name: 'schoolId',
+    required: true,
+    type: Number,
+    description: 'School ID',
+    example: 1,
+  })
+  @ApiOkResponse({ description: 'Route plan updated successfully' })
+  @ApiResponse({ status: 404, description: 'Route plan not found' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  updateRoutePlan(
+    @Param('id') id: string,
+    @Body() updateRoutePlanDto: UpdateRoutePlanDto,
+    @Query('schoolId') schoolId: string,
+  ) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId query parameter is required');
+    }
+    return this.superAdminService.updateRoutePlan(+id, updateRoutePlanDto, +schoolId);
+  }
+
+  @Delete('route-plans/:id')
+  @ApiOperation({ summary: 'Delete route plan (Super Admin only)' })
+  @ApiParam({ name: 'id', description: 'Route plan ID', type: Number })
+  @ApiQuery({
+    name: 'schoolId',
+    required: true,
+    type: Number,
+    description: 'School ID',
+    example: 1,
+  })
+  @ApiOkResponse({ description: 'Route plan deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Route plan not found' })
+  @ApiResponse({ status: 400, description: 'Cannot delete - route plan is in use' })
+  removeRoutePlan(@Param('id') id: string, @Query('schoolId') schoolId: string) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId query parameter is required');
+    }
+    return this.superAdminService.removeRoutePlan(+id, +schoolId);
   }
 }

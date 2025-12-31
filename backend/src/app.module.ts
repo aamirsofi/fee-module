@@ -17,6 +17,7 @@ import { SchoolContextModule } from './middleware/school-context.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { CategoryHeadsModule } from './category-heads/category-heads.module';
 import { ClassesModule } from './classes/classes.module';
+import { RoutesModule } from './routes/routes.module';
 import { DatabaseConfig } from './database/database.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -59,6 +60,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     SuperAdminModule,
     CategoryHeadsModule,
     ClassesModule,
+    RoutesModule,
   ],
   controllers: [AppController],
   providers: [

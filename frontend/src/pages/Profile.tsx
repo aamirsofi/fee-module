@@ -1,33 +1,74 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { usersService } from '../services/users.service';
-import api from '../services/api';
-import { FiUser, FiMail, FiLock, FiSave, FiLoader, FiCheck } from 'react-icons/fi';
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { usersService } from "../services/users.service";
+import {
+  FiUser,
+  FiMail,
+  FiLock,
+  FiSave,
+  FiLoader,
+  FiCheck,
+} from "react-icons/fi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Profile() {
-  const { user, login } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
-  
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<"profile" | "password">("profile");
+
   const [profileData, setProfileData] = useState({
-    name: '',
-    email: '',
+    name: "",
+    email: "",
   });
 
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
 
   useEffect(() => {
+    // Always check both user object and localStorage to ensure we have the latest data
+    let name = "";
+    let email = "";
+
     if (user) {
+      name = user.name || "";
+      email = user.email || "";
+    }
+
+    // Also check localStorage as fallback or if user object doesn't have name
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        if (parsedUser.name && !name) {
+          name = parsedUser.name;
+        }
+        if (parsedUser.email && !email) {
+          email = parsedUser.email;
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
+    // Only update if we have data
+    if (name || email) {
       setProfileData({
-        name: user.name || '',
-        email: user.email || '',
+        name: name,
+        email: email,
       });
     }
   }, [user]);
@@ -38,26 +79,26 @@ export default function Profile() {
 
     try {
       setSaving(true);
-      setError('');
-      setSuccess('');
-      
+      setError("");
+      setSuccess("");
+
       const updatedUser = await usersService.updateProfile(user.id, {
         name: profileData.name,
         email: profileData.email,
       });
 
       // Update auth context with new user data
-      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
       const updatedUserData = { ...storedUser, ...updatedUser };
-      localStorage.setItem('user', JSON.stringify(updatedUserData));
-      
+      localStorage.setItem("user", JSON.stringify(updatedUserData));
+
       // Reload page to update auth context
       window.location.reload();
-      
-      setSuccess('Profile updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+
+      setSuccess("Profile updated successfully!");
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update profile');
+      setError(err.response?.data?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -68,35 +109,35 @@ export default function Profile() {
     if (!user) return;
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError('New passwords do not match');
+      setError("New passwords do not match");
       return;
     }
 
     if (passwordData.newPassword.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError("Password must be at least 8 characters long");
       return;
     }
 
     try {
       setSaving(true);
-      setError('');
-      setSuccess('');
-      
+      setError("");
+      setSuccess("");
+
       await usersService.updatePassword(
         user.id,
         passwordData.currentPassword,
         passwordData.newPassword
       );
 
-      setSuccess('Password updated successfully!');
+      setSuccess("Password updated successfully!");
       setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
       });
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update password');
+      setError(err.response?.data?.message || "Failed to update password");
     } finally {
       setSaving(false);
     }
@@ -105,215 +146,241 @@ export default function Profile() {
   if (!user) {
     return (
       <div className="flex items-center justify-center py-12">
-        <FiLoader className="w-8 h-8 animate-spin text-indigo-600" />
+        <FiLoader className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-          My Profile
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">Manage your account settings and preferences</p>
-      </div>
+      {/* Header - Using shadcn/ui Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+            My Profile
+          </CardTitle>
+          <CardDescription>
+            Manage your account settings and preferences
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
-      {/* Success/Error Messages */}
+      {/* Success/Error Messages - Using shadcn/ui Card */}
       {success && (
-        <div className="card-modern rounded-xl p-3 bg-green-50 border-l-2 border-green-400">
-          <div className="flex items-center gap-2">
-            <FiCheck className="w-4 h-4 text-green-600" />
-            <p className="text-sm text-green-700">{success}</p>
-          </div>
-        </div>
+        <Card className="border-green-400 border-l-4 bg-green-50/50">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <FiCheck className="w-4 h-4 text-green-600" />
+              <p className="text-sm text-green-700">{success}</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
       {error && (
-        <div className="card-modern rounded-xl p-3 bg-red-50 border-l-2 border-red-400">
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
+        <Card className="border-destructive border-l-4 bg-destructive/10">
+          <CardContent className="p-3">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Tabs */}
-      <div className="card-modern rounded-xl p-4">
-        <div className="flex gap-2 border-b border-gray-200 mb-4">
-          <button
-            onClick={() => {
-              setActiveTab('profile');
-              setError('');
-              setSuccess('');
+      {/* Tabs - Using shadcn/ui Tabs with custom styling */}
+      <Card>
+        <CardContent className="p-4">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              setActiveTab(value as "profile" | "password");
+              setError("");
+              setSuccess("");
             }}
-            className={`px-4 py-2 text-sm font-medium transition-smooth ${
-              activeTab === 'profile'
-                ? 'text-indigo-600 border-b-2 border-indigo-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
           >
-            Profile Information
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('password');
-              setError('');
-              setSuccess('');
-            }}
-            className={`px-4 py-2 text-sm font-medium transition-smooth ${
-              activeTab === 'password'
-                ? 'text-indigo-600 border-b-2 border-indigo-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Change Password
-          </button>
-        </div>
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-transparent p-0 h-auto border-b border-gray-200 rounded-none">
+              <TabsTrigger
+                value="profile"
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-4 py-2 text-sm font-medium transition-all"
+              >
+                Profile Information
+              </TabsTrigger>
+              <TabsTrigger
+                value="password"
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-4 py-2 text-sm font-medium transition-all"
+              >
+                Change Password
+              </TabsTrigger>
+            </TabsList>
 
-        {/* Profile Tab */}
-        {activeTab === 'profile' && (
-          <form onSubmit={handleProfileUpdate} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  <FiUser className="w-3 h-3 inline mr-1" />
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
-                  value={profileData.name}
-                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  <FiMail className="w-3 h-3 inline mr-1" />
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
-                  value={profileData.email}
-                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs font-semibold text-gray-700 mb-1">Role</p>
-                <p className="text-sm text-gray-600 capitalize">
-                  {user.role?.replace('_', ' ')}
-                </p>
-              </div>
-            </div>
-
-            {user.schoolId && (
-              <div className="pt-2">
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-700 mb-1">School ID</p>
-                  <p className="text-sm text-gray-600">{user.schoolId}</p>
+            {/* Profile Tab */}
+            <TabsContent value="profile" className="space-y-4">
+              <form onSubmit={handleProfileUpdate} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      <FiUser className="w-3 h-3 inline mr-1" />
+                      Full Name *
+                    </label>
+                    <Input
+                      type="text"
+                      required
+                      value={profileData.name || ""}
+                      onChange={(e) =>
+                        setProfileData({ ...profileData, name: e.target.value })
+                      }
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      <FiMail className="w-3 h-3 inline mr-1" />
+                      Email Address *
+                    </label>
+                    <Input
+                      type="email"
+                      required
+                      value={profileData.email}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          email: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
 
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
-              >
-                {saving ? (
-                  <>
-                    <FiLoader className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <FiSave className="w-4 h-4" />
-                    Save Changes
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        )}
+                <div className="pt-2">
+                  <Card className="bg-muted">
+                    <CardContent className="p-3">
+                      <p className="text-xs font-semibold text-foreground mb-1">
+                        Role
+                      </p>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {user.role?.replace("_", " ")}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
 
-        {/* Password Tab */}
-        {activeTab === 'password' && (
-          <form onSubmit={handlePasswordUpdate} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                <FiLock className="w-3 h-3 inline mr-1" />
-                Current Password *
-              </label>
-              <input
-                type="password"
-                required
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
-                value={passwordData.currentPassword}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, currentPassword: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                <FiLock className="w-3 h-3 inline mr-1" />
-                New Password *
-              </label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
-                value={passwordData.newPassword}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, newPassword: e.target.value })
-                }
-              />
-              <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters</p>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                <FiLock className="w-3 h-3 inline mr-1" />
-                Confirm New Password *
-              </label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
-                value={passwordData.confirmPassword}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, confirmPassword: e.target.value })
-                }
-              />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
-              >
-                {saving ? (
-                  <>
-                    <FiLoader className="w-4 h-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <FiLock className="w-4 h-4" />
-                    Update Password
-                  </>
+                {user.schoolId && (
+                  <div className="pt-2">
+                    <Card className="bg-muted">
+                      <CardContent className="p-3">
+                        <p className="text-xs font-semibold text-foreground mb-1">
+                          School ID
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {user.schoolId}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
                 )}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
+                  >
+                    {saving ? (
+                      <>
+                        <FiLoader className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <FiSave className="w-4 h-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </TabsContent>
+
+            {/* Password Tab */}
+            <TabsContent value="password" className="space-y-4 mt-0">
+              <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    <FiLock className="w-3 h-3 inline mr-1" />
+                    Current Password *
+                  </label>
+                  <Input
+                    type="password"
+                    required
+                    value={passwordData.currentPassword}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        currentPassword: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    <FiLock className="w-3 h-3 inline mr-1" />
+                    New Password *
+                  </label>
+                  <Input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={passwordData.newPassword}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        newPassword: e.target.value,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Must be at least 8 characters
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    <FiLock className="w-3 h-3 inline mr-1" />
+                    Confirm New Password *
+                  </label>
+                  <Input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        confirmPassword: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
+                  >
+                    {saving ? (
+                      <>
+                        <FiLoader className="w-4 h-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <FiLock className="w-4 h-4" />
+                        Update Password
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

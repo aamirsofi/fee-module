@@ -2,8 +2,15 @@ import api from './api';
 import { School } from '../types';
 
 export const schoolsService = {
+  /**
+   * Get all schools - defaults to active schools only
+   * Note: This endpoint is for school admins. For super admin, use schoolService.getSchools()
+   */
   async getAll(): Promise<School[]> {
-    const response = await api.instance.get<School[]>('/schools');
+    // Default to active schools only to prevent adding data to inactive schools
+    const response = await api.instance.get<School[]>('/schools', {
+      params: { status: 'active' },
+    });
     return response.data;
   },
 

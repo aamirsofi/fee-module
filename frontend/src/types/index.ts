@@ -57,8 +57,6 @@ export interface Student {
 
 export type FeeCategoryType = 'school' | 'transport';
 
-export type CategoryHead = 'general' | 'sponsored';
-
 export interface FeeCategory {
   id: number;
   name: string;
@@ -79,7 +77,7 @@ export interface FeeStructure {
   name: string;
   description?: string;
   amount: number;
-  class?: string;
+  classId?: number;
   academicYear: string;
   dueDate?: string;
   status: 'active' | 'inactive';
@@ -96,6 +94,40 @@ export interface CategoryHead {
   name: string;
   description?: string;
   status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Route {
+  id: number;
+  schoolId: number;
+  name: string;
+  description?: string;
+  status: 'active' | 'inactive';
+  school?: School;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoutePlan {
+  id: number;
+  schoolId: number;
+  routeId: number;
+  categoryHeadId?: number;
+  feeCategoryId: number; // Transport fee category (Fee Heading of type transport)
+  classId?: number;
+  name: string;
+  description?: string;
+  amount: number;
+  status: 'active' | 'inactive';
+  route?: Route;
+  categoryHead?: CategoryHead;
+  feeCategory?: FeeCategory;
+  class?: {
+    id: number;
+    name: string;
+  };
+  school?: School;
   createdAt: string;
   updatedAt: string;
 }

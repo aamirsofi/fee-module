@@ -1,41 +1,65 @@
 import { useState, useEffect } from "react";
-import {
-  FiEdit,
-  FiTrash2,
-  FiLoader,
-  FiDollarSign,
-  FiX,
-  FiSearch,
-  FiDownload,
-} from "react-icons/fi";
+import { FiLoader, FiDownload, FiUpload } from "react-icons/fi";
+// useDropzone is now in useFeePlanImport hook
 import api from "../../services/api";
-import CustomDropdown from "../../components/ui/CustomDropdown";
-import Pagination from "../../components/Pagination";
-import { FeeStructure, FeeCategory, CategoryHead, School } from "../../types";
-
-interface PaginationMeta {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-}
+import { FeeStructure } from "../../types";
+import {
+  validateSingleModeForm,
+  validateMultipleModeForm,
+  validateEditForm,
+  generateCombinations,
+  filterDuplicates,
+  generatePlanNameFromIds,
+} from "../../utils/feePlan";
+import { useFeePlanData } from "../../hooks/pages/super-admin/useFeePlanData";
+import { useFeePlanImport } from "../../hooks/pages/super-admin/useFeePlanImport";
+import { useFeePlanSelection } from "../../hooks/pages/super-admin/useFeePlanSelection";
+// import { useFeePlanForm } from "../../hooks/pages/super-admin/useFeePlanForm"; // TODO: Fix circular dependency
+import { FeePlanFilters } from "./components/FeePlanFilters";
+import { FeePlanDialogs } from "./components/FeePlanDialogs";
+import { FeePlanTable } from "./components/FeePlanTable";
+import { FeePlanForm } from "./components/FeePlanForm";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export default function FeePlan() {
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
-  const [feeCategories, setFeeCategories] = useState<FeeCategory[]>([]);
-  const [categoryHeads, setCategoryHeads] = useState<CategoryHead[]>([]);
-  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
-  const [classOptions, setClassOptions] = useState<
-    Array<{ id: number; name: string }>
-  >([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingSchools, setLoadingSchools] = useState(true);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-  const [loadingCategoryHeads, setLoadingCategoryHeads] = useState(false);
-  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [mode, setMode] = useState<"add" | "import">("add");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState("");
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | number>("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<{
+    id: number;
+    schoolId: number;
+  } | null>(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+
+  // Initialize form state first (needed for formSchoolId)
+  const [formData, setFormData] = useState({
+    feeCategoryId: "" as string | number,
+    categoryHeadId: "" as string | number | null,
+    amount: "",
+    classId: "" as string | number,
+    status: "active" as "active" | "inactive",
+    schoolId: "" as string | number,
+  });
   const [createMode, setCreateMode] = useState<"single" | "multiple">("single");
   const [selectedFeeCategoryIds, setSelectedFeeCategoryIds] = useState<
     number[]
@@ -43,256 +67,79 @@ export default function FeePlan() {
   const [selectedCategoryHeadIds, setSelectedCategoryHeadIds] = useState<
     number[]
   >([]);
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
   const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(
     null
   );
-  const [formData, setFormData] = useState({
-    feeCategoryId: "" as string | number,
-    categoryHeadId: "" as string | number | null,
-    amount: "",
-    class: "",
-    status: "active" as "active" | "inactive",
-    schoolId: "" as string | number,
-  });
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [search, setSearch] = useState("");
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string | number>("");
-  const [selectedFeeCategoryId, setSelectedFeeCategoryId] = useState<
-    string | number
-  >("");
-  const [selectedCategoryHeadId, setSelectedCategoryHeadId] = useState<
-    string | number | null
-  >(null);
-  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(
-    null
-  );
-  const [selectedFeePlanIds, setSelectedFeePlanIds] = useState<number[]>([]);
-  const [isSelectAll, setIsSelectAll] = useState(false);
+  const [formResetKey, setFormResetKey] = useState(0);
 
-  useEffect(() => {
-    loadFeeStructures();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
+  // Use custom hook for all data fetching
+  const {
+    feeStructures,
+    paginationMeta,
+    loadingFeeStructures: loading,
+    refetchFeeStructures,
+    feeCategories,
+    loadingCategories,
+    schools,
+    loadingSchools,
+    categoryHeads,
+    loadingCategoryHeads,
+    classOptions,
+    availableClasses,
+    loadingClasses,
+  } = useFeePlanData({
     page,
     limit,
     search,
     selectedSchoolId,
-    selectedFeeCategoryId,
-    selectedCategoryHeadId,
-  ]);
+    formSchoolId: formData.schoolId,
+  });
+
+  // Use custom hook for import functionality
+  const {
+    importSchoolId,
+    setImportSchoolId,
+    importFile,
+    setImportFile,
+    importPreview,
+    setImportPreview,
+    isImporting,
+    importResult,
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    downloadSampleCSV,
+    handleBulkImport,
+  } = useFeePlanImport({
+    refetchFeeStructures,
+    setError,
+    setSuccess,
+  });
+
+  // Use custom hook for selection functionality
+  const {
+    selectedFeePlanIds,
+    setSelectedFeePlanIds,
+    isSelectAll,
+    setIsSelectAll,
+    handleSelectAll,
+    handleSelectFeePlan,
+    handleExport,
+    handleBulkDelete,
+  } = useFeePlanSelection({
+    feeStructures,
+    classOptions,
+    refetchFeeStructures,
+    setError,
+    setSuccess,
+  });
 
   useEffect(() => {
-    loadSchools();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (formData.schoolId) {
-      loadFeeCategories();
-      loadCategoryHeads();
-      loadAvailableClasses();
-    } else {
-      setFeeCategories([]);
-      setCategoryHeads([]);
-      setClassOptions([]);
-      setAvailableClasses([]);
-      // Clear class selection when school changes
-      setFormData((prev) => ({ ...prev, class: "" }));
+    if (!formData.schoolId) {
+      setFormData((prev) => ({ ...prev, classId: "" }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.schoolId]);
-
-  const loadSchools = async () => {
-    try {
-      setLoadingSchools(true);
-      setError("");
-
-      let allSchools: School[] = [];
-      let currentPage = 1;
-      let hasMorePages = true;
-      const pageLimit = 100;
-
-      while (hasMorePages) {
-        const response = await api.instance.get("/super-admin/schools", {
-          params: { page: currentPage, limit: pageLimit, status: "active" },
-        });
-
-        if (
-          response.data &&
-          response.data.data &&
-          Array.isArray(response.data.data)
-        ) {
-          allSchools = [...allSchools, ...response.data.data];
-
-          const meta = response.data.meta;
-          if (meta && meta.hasNextPage) {
-            currentPage++;
-          } else {
-            hasMorePages = false;
-          }
-        } else if (Array.isArray(response.data)) {
-          allSchools = [...allSchools, ...response.data];
-          hasMorePages = false;
-        } else {
-          hasMorePages = false;
-        }
-      }
-
-      setSchools(allSchools);
-    } catch (err: any) {
-      console.error("Error loading schools:", err);
-      setSchools([]);
-    } finally {
-      setLoadingSchools(false);
-    }
-  };
-
-  const loadFeeCategories = async () => {
-    if (!formData.schoolId) return;
-
-    try {
-      setLoadingCategories(true);
-      const response = await api.instance.get("/super-admin/fee-categories", {
-        params: {
-          schoolId: formData.schoolId,
-          limit: 1000,
-          page: 1,
-        },
-      });
-
-      console.log("Fee categories response:", response.data);
-
-      if (response.data.data && Array.isArray(response.data.data)) {
-        setFeeCategories(response.data.data);
-      } else if (Array.isArray(response.data)) {
-        setFeeCategories(response.data);
-      } else {
-        setFeeCategories([]);
-      }
-    } catch (err: any) {
-      console.error("Error loading fee categories:", err);
-      console.error("Error details:", err.response?.data);
-      setFeeCategories([]);
-    } finally {
-      setLoadingCategories(false);
-    }
-  };
-
-  const loadCategoryHeads = async () => {
-    if (!formData.schoolId) return;
-
-    try {
-      setLoadingCategoryHeads(true);
-      const response = await api.instance.get("/super-admin/category-heads", {
-        params: { schoolId: formData.schoolId, limit: 1000, status: "active" },
-      });
-
-      if (response.data.data && Array.isArray(response.data.data)) {
-        setCategoryHeads(response.data.data);
-      } else if (Array.isArray(response.data)) {
-        setCategoryHeads(response.data);
-      }
-    } catch (err: any) {
-      console.error("Error loading category heads:", err);
-      setCategoryHeads([]);
-    } finally {
-      setLoadingCategoryHeads(false);
-    }
-  };
-
-  const loadAvailableClasses = async () => {
-    if (!formData.schoolId) return;
-
-    try {
-      setLoadingClasses(true);
-      // Fetch classes from the Classes module
-      const response = await api.instance.get("/classes", {
-        params: {
-          schoolId: formData.schoolId,
-          limit: 1000, // Get all classes
-          page: 1,
-        },
-      });
-
-      // Extract class objects and names from the response
-      let classes: Array<{ id: number; name: string }> = [];
-      let classNames: string[] = [];
-
-      if (response.data.data && Array.isArray(response.data.data)) {
-        // Paginated response
-        classes = response.data.data.map((cls: any) => ({
-          id: cls.id,
-          name: cls.name,
-        }));
-        classNames = response.data.data.map((cls: any) => cls.name);
-      } else if (Array.isArray(response.data)) {
-        // Direct array response
-        classes = response.data.map((cls: any) => ({
-          id: cls.id,
-          name: cls.name,
-        }));
-        classNames = response.data.map((cls: any) => cls.name);
-      }
-
-      setClassOptions(classes);
-      setAvailableClasses(classNames);
-    } catch (err: any) {
-      console.error("Error loading classes:", err);
-      console.error("Error details:", err.response?.data);
-      setClassOptions([]);
-      setAvailableClasses([]);
-    } finally {
-      setLoadingClasses(false);
-    }
-  };
-
-  const loadFeeStructures = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const params: any = { page, limit };
-      if (search.trim()) {
-        params.search = search.trim();
-      }
-      if (selectedSchoolId) {
-        params.schoolId = selectedSchoolId;
-      }
-      if (selectedFeeCategoryId) {
-        params.feeCategoryId = selectedFeeCategoryId;
-      }
-      if (selectedCategoryHeadId !== null && selectedCategoryHeadId !== "") {
-        params.categoryHeadId = selectedCategoryHeadId;
-      }
-
-      const response = await api.instance.get("/super-admin/fee-structures", {
-        params,
-      });
-
-      if (response.data.data && response.data.meta) {
-        setFeeStructures(response.data.data);
-        setPaginationMeta(response.data.meta);
-      } else if (Array.isArray(response.data)) {
-        setFeeStructures(response.data);
-        setPaginationMeta({
-          total: response.data.length,
-          page: 1,
-          limit: response.data.length,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPrevPage: false,
-        });
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load fee structures");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,107 +147,88 @@ export default function FeePlan() {
       setError("");
       setSuccess("");
 
-      if (!formData.schoolId) {
-        setError("Please select a school");
-        return;
-      }
-
-      if (!formData.amount || parseFloat(formData.amount) <= 0) {
-        setError("Please enter a valid amount");
-        return;
-      }
-
-      // Validate based on mode
-      if (createMode === "multiple") {
-        if (selectedFeeCategoryIds.length === 0) {
-          setError("Please select at least one fee heading");
-          return;
-        }
-        if (selectedClasses.length === 0) {
-          setError("Please select at least one class");
-          return;
-        }
+      // Validate form using utility functions
+      let validation;
+      if (editingStructure) {
+        validation = validateEditForm(formData);
+      } else if (createMode === "multiple") {
+        validation = validateMultipleModeForm(
+          formData,
+          selectedFeeCategoryIds,
+          selectedClasses
+        );
       } else {
-        if (!formData.feeCategoryId) {
-          setError("Please select a fee heading");
-          return;
-        }
-        if (!formData.class || !formData.class.trim()) {
-          setError("Please select a class");
-          return;
-        }
+        validation = validateSingleModeForm(formData);
       }
 
-      const currentSchoolId = formData.schoolId;
+      if (!validation.isValid) {
+        setError(validation.error || "Validation failed");
+        return;
+      }
+
+      // Convert schoolId to number
+      const schoolIdNum =
+        typeof formData.schoolId === "string"
+          ? parseInt(formData.schoolId, 10)
+          : formData.schoolId;
+
+      const currentSchoolId = schoolIdNum;
 
       if (editingStructure) {
         // Single edit mode
-        if (!formData.class || !formData.class.trim()) {
+        if (!formData.classId) {
           setError("Please select a class");
           return;
         }
 
-        const selectedCategory = feeCategories.find(
-          (cat) => cat.id === parseInt(formData.feeCategoryId as string)
-        );
-        const selectedCategoryHead = categoryHeads.find(
-          (ch) => ch.id === parseInt(formData.categoryHeadId as string)
-        );
+        const classIdNum =
+          typeof formData.classId === "number"
+            ? formData.classId
+            : parseInt(formData.classId as string);
 
-        const basePlanName = selectedCategory
-          ? `${selectedCategory.name}${
-              selectedCategoryHead ? ` - ${selectedCategoryHead.name}` : ""
-            }`
-          : "Fee Plan";
-
-        const planName = `${basePlanName} (${formData.class})`;
+        // Generate plan name using utility function
+        const planName = generatePlanNameFromIds(
+          parseInt(formData.feeCategoryId as string),
+          formData.categoryHeadId
+            ? parseInt(formData.categoryHeadId as string)
+            : null,
+          classIdNum,
+          feeCategories,
+          categoryHeads,
+          classOptions
+        );
 
         const payload: any = {
           name: planName,
           feeCategoryId: parseInt(formData.feeCategoryId as string),
           amount: parseFloat(formData.amount),
           status: formData.status,
-          class: formData.class.trim(),
         };
 
         if (formData.categoryHeadId) {
           payload.categoryHeadId = parseInt(formData.categoryHeadId as string);
         }
 
+        if (classIdNum) {
+          payload.classId = classIdNum;
+        }
+
         await api.instance.patch(
           `/super-admin/fee-structures/${editingStructure.id}?schoolId=${currentSchoolId}`,
           payload
         );
-        setSuccess("Fee plan updated successfully!");
         setEditingStructure(null);
         resetForm(true, currentSchoolId);
+        setSuccess("Fee plan updated successfully!");
       } else {
         // Create mode
         if (createMode === "multiple") {
-          // Generate all combinations
-          const combinations: Array<{
-            feeCategoryId: number;
-            categoryHeadId: number | null;
-            className: string;
-          }> = [];
-
-          // If no category heads selected, include null (General)
-          const categoryHeadIdsToUse =
-            selectedCategoryHeadIds.length > 0
-              ? selectedCategoryHeadIds
-              : [null];
-
-          selectedFeeCategoryIds.forEach((feeCategoryId) => {
-            categoryHeadIdsToUse.forEach((categoryHeadId) => {
-              selectedClasses.forEach((className) => {
-                combinations.push({
-                  feeCategoryId,
-                  categoryHeadId,
-                  className,
-                });
-              });
-            });
-          });
+          // Generate all combinations using utility function
+          const combinations = generateCombinations(
+            selectedFeeCategoryIds,
+            selectedCategoryHeadIds,
+            selectedClasses
+          );
 
           // Check for existing fee structures to avoid duplicates
           const existingStructuresResponse = await api.instance.get(
@@ -422,21 +250,11 @@ export default function FeePlan() {
             ? existingStructuresResponse.data
             : [];
 
-          // Filter out duplicates
-          const newCombinations = combinations.filter((combo) => {
-            return !existingStructures.some((existing: any) => {
-              const matchesFeeCategory =
-                existing.feeCategoryId === combo.feeCategoryId;
-              const matchesCategoryHead =
-                existing.categoryHeadId === combo.categoryHeadId ||
-                (!existing.categoryHeadId && !combo.categoryHeadId);
-              const matchesClass =
-                existing.class === combo.className ||
-                (!existing.class && !combo.className);
-
-              return matchesFeeCategory && matchesCategoryHead && matchesClass;
-            });
-          });
+          // Filter out duplicates using utility function
+          const newCombinations = filterDuplicates(
+            combinations,
+            existingStructures
+          );
 
           const duplicateCount = combinations.length - newCombinations.length;
 
@@ -448,73 +266,111 @@ export default function FeePlan() {
             return;
           }
 
-          // Create only new combinations
-          const promises = newCombinations.map((combo) => {
-            const feeCategory = feeCategories.find(
-              (cat) => cat.id === combo.feeCategoryId
-            );
-            const categoryHead = combo.categoryHeadId
-              ? categoryHeads.find((ch) => ch.id === combo.categoryHeadId)
-              : null;
+          // Create only new combinations with error handling
+          let successCount = 0;
+          let failedCount = 0;
+          const failedNames: string[] = [];
 
-            const planName = `${feeCategory?.name || "Fee Plan"}${
-              categoryHead ? ` - ${categoryHead.name}` : ""
-            }${combo.className ? ` (${combo.className})` : ""}`;
+          for (const combo of newCombinations) {
+            try {
+              // Generate plan name using utility function
+              const planName = generatePlanNameFromIds(
+                combo.feeCategoryId,
+                combo.categoryHeadId,
+                combo.classId,
+                feeCategories,
+                categoryHeads,
+                classOptions
+              );
 
-            const payload: any = {
-              name: planName,
-              feeCategoryId: combo.feeCategoryId,
-              amount: parseFloat(formData.amount),
-              status: formData.status,
-            };
+              const payload: any = {
+                name: planName,
+                feeCategoryId: combo.feeCategoryId,
+                amount: parseFloat(formData.amount),
+                status: formData.status,
+              };
 
-            if (combo.categoryHeadId) {
-              payload.categoryHeadId = combo.categoryHeadId;
+              if (combo.categoryHeadId) {
+                payload.categoryHeadId = combo.categoryHeadId;
+              }
+
+              if (combo.classId) {
+                payload.classId = combo.classId;
+              }
+
+              await api.instance.post(
+                `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
+                payload
+              );
+              successCount++;
+            } catch (err: any) {
+              failedCount++;
+              // Generate plan name using utility function
+              const planName = generatePlanNameFromIds(
+                combo.feeCategoryId,
+                combo.categoryHeadId,
+                combo.classId,
+                feeCategories,
+                categoryHeads,
+                classOptions
+              );
+
+              // Check if it's a duplicate error (400) or other error
+              if (err.response?.status === 400) {
+                // Likely a duplicate, skip it
+                failedNames.push(planName);
+              } else {
+                // Other error, add to failed list
+                failedNames.push(planName);
+              }
             }
-
-            if (combo.className) {
-              payload.class = combo.className;
-            }
-
-            return api.instance.post(
-              `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
-              payload
-            );
-          });
-
-          await Promise.all(promises);
-
-          let successMessage = `Successfully created ${newCombinations.length} fee plan(s)!`;
-          if (duplicateCount > 0) {
-            successMessage += ` (${duplicateCount} already existed and were skipped)`;
           }
-          setSuccess(successMessage);
+
+          // Build success message
+          let successMessage = "";
+          if (successCount > 0) {
+            successMessage = `Successfully created ${successCount} fee plan(s)!`;
+          }
+          if (duplicateCount > 0 || failedCount > 0) {
+            const totalSkipped = duplicateCount + failedCount;
+            if (successMessage) {
+              successMessage += ` (${totalSkipped} already existed or failed and were skipped)`;
+            } else {
+              successMessage = `All ${combinations.length} fee plan(s) already exist or failed. No new plans created.`;
+            }
+          }
+          if (successMessage) {
+            setSuccess(successMessage);
+          } else {
+            setError("Failed to create fee plans. Please try again.");
+          }
           setSelectedFeeCategoryIds([]);
           setSelectedCategoryHeadIds([]);
           setSelectedClasses([]);
         } else {
           // Single create mode
-          const selectedCategory = feeCategories.find(
-            (cat) => cat.id === parseInt(formData.feeCategoryId as string)
-          );
-          const selectedCategoryHead = categoryHeads.find(
-            (ch) => ch.id === parseInt(formData.categoryHeadId as string)
-          );
+          const classIdNum =
+            typeof formData.classId === "number"
+              ? formData.classId
+              : parseInt(formData.classId as string);
 
-          const basePlanName = selectedCategory
-            ? `${selectedCategory.name}${
-                selectedCategoryHead ? ` - ${selectedCategoryHead.name}` : ""
-              }`
-            : "Fee Plan";
-
-          const planName = `${basePlanName} (${formData.class})`;
+          // Generate plan name using utility function
+          const planName = generatePlanNameFromIds(
+            parseInt(formData.feeCategoryId as string),
+            formData.categoryHeadId
+              ? parseInt(formData.categoryHeadId as string)
+              : null,
+            classIdNum,
+            feeCategories,
+            categoryHeads,
+            classOptions
+          );
 
           const payload: any = {
             name: planName,
             feeCategoryId: parseInt(formData.feeCategoryId as string),
             amount: parseFloat(formData.amount),
             status: formData.status,
-            class: formData.class.trim(),
           };
 
           if (formData.categoryHeadId) {
@@ -523,16 +379,20 @@ export default function FeePlan() {
             );
           }
 
+          if (classIdNum) {
+            payload.classId = classIdNum;
+          }
+
           await api.instance.post(
             `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
             payload
           );
-          setSuccess("Fee plan created successfully!");
         }
         resetForm(true, currentSchoolId);
+        setSuccess("Fee plan created successfully!");
       }
 
-      loadFeeStructures();
+      refetchFeeStructures();
 
       setTimeout(() => setSuccess(""), 5000);
     } catch (err: any) {
@@ -548,26 +408,33 @@ export default function FeePlan() {
     schoolId?: string | number
   ) => {
     setFormData({
-      feeCategoryId: "",
+      feeCategoryId: "" as string | number,
       categoryHeadId: null,
       amount: "",
-      class: "",
-      status: "active",
-      schoolId: retainSchool && schoolId ? schoolId : "",
+      classId: "",
+      status: "active" as "active" | "inactive",
+      schoolId: retainSchool && schoolId ? schoolId : ("" as string | number),
     });
     setCreateMode("single");
     setSelectedFeeCategoryIds([]);
     setSelectedCategoryHeadIds([]);
     setSelectedClasses([]);
+    setError("");
+    // Don't clear success here - let the caller manage success messages
+    // Force re-render of Select components
+    setFormResetKey((prev) => prev + 1);
   };
 
   const handleEdit = (structure: FeeStructure) => {
     setEditingStructure(structure);
+    // Use classId directly
+    const classId: string | number = structure.classId || "";
+
     setFormData({
       feeCategoryId: structure.feeCategoryId,
       categoryHeadId: structure.categoryHeadId || null,
       amount: structure.amount.toString(),
-      class: structure.class || "",
+      classId: classId,
       status: structure.status,
       schoolId: structure.schoolId,
     });
@@ -575,21 +442,23 @@ export default function FeePlan() {
     setSuccess("");
   };
 
-  const handleDelete = async (id: number, schoolId: number) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this fee plan? This action cannot be undone."
-      )
-    )
-      return;
+  const handleDeleteClick = (id: number, schoolId: number) => {
+    setDeleteItem({ id, schoolId });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteItem) return;
 
     try {
       setError("");
       await api.instance.delete(
-        `/super-admin/fee-structures/${id}?schoolId=${schoolId}`
+        `/super-admin/fee-structures/${deleteItem.id}?schoolId=${deleteItem.schoolId}`
       );
       setSuccess("Fee plan deleted successfully!");
-      loadFeeStructures();
+      setDeleteDialogOpen(false);
+      setDeleteItem(null);
+      refetchFeeStructures();
       setTimeout(() => setSuccess(""), 5000);
     } catch (err: any) {
       const errorMessage =
@@ -606,868 +475,444 @@ export default function FeePlan() {
     setSuccess("");
   };
 
-  // Bulk operations
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = feeStructures.map((s) => s.id);
-      setSelectedFeePlanIds(allIds);
-      setIsSelectAll(true);
-    } else {
-      setSelectedFeePlanIds([]);
-      setIsSelectAll(false);
-    }
-  };
-
-  const handleSelectFeePlan = (id: number, checked: boolean) => {
-    if (checked) {
-      setSelectedFeePlanIds([...selectedFeePlanIds, id]);
-    } else {
-      setSelectedFeePlanIds(selectedFeePlanIds.filter((fid) => fid !== id));
-      setIsSelectAll(false);
-    }
-  };
-
-  const handleBulkDelete = async () => {
+  // Bulk operations are now in useFeePlanSelection hook
+  const handleBulkDeleteClick = () => {
     if (selectedFeePlanIds.length === 0) {
       setError("Please select at least one fee plan to delete");
       return;
     }
-
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedFeePlanIds.length} fee plan(s)? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setError("");
-      setSuccess("");
-
-      // Delete all selected fee plans
-      const deletePromises = selectedFeePlanIds.map(async (id) => {
-        const structure = feeStructures.find((s) => s.id === id);
-        if (structure) {
-          return api.instance.delete(
-            `/super-admin/fee-structures/${id}?schoolId=${structure.schoolId}`
-          );
-        }
-      });
-
-      await Promise.all(deletePromises);
-      setSuccess(
-        `Successfully deleted ${selectedFeePlanIds.length} fee plan(s)!`
-      );
-      setSelectedFeePlanIds([]);
-      setIsSelectAll(false);
-      loadFeeStructures();
-      setTimeout(() => setSuccess(""), 5000);
-    } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.message || "Failed to delete fee plans";
-      setError(errorMessage);
-      setTimeout(() => setError(""), 5000);
-    }
+    setBulkDeleteDialogOpen(true);
   };
 
-  const handleExport = () => {
-    if (selectedFeePlanIds.length === 0) {
-      setError("Please select at least one fee plan to export");
-      return;
-    }
-
-    // Get selected fee plans
-    const selectedPlans = feeStructures.filter((s) =>
-      selectedFeePlanIds.includes(s.id)
-    );
-
-    // Convert to CSV
-    const headers = [
-      "Plan Name",
-      "School",
-      "Class",
-      "Category Head",
-      "Fee Heading",
-      "Amount",
-      "Status",
-      "Created At",
-    ];
-
-    const rows = selectedPlans.map((plan) => [
-      plan.name,
-      plan.school?.name || `School ID: ${plan.schoolId}`,
-      plan.class || "",
-      plan.categoryHead?.name || "General",
-      plan.category?.name || `Category ID: ${plan.feeCategoryId}`,
-      plan.amount.toString(),
-      plan.status,
-      new Date(plan.createdAt).toLocaleDateString(),
-    ]);
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    // Download CSV
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `fee-plans-${new Date().toISOString().split("T")[0]}.csv`
-    );
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setSuccess(
-      `Exported ${selectedFeePlanIds.length} fee plan(s) successfully!`
-    );
-    setTimeout(() => setSuccess(""), 3000);
+  const handleBulkDeleteWithDialog = async () => {
+    await handleBulkDelete();
+    setBulkDeleteDialogOpen(false);
   };
 
-  // Update select all state when selection changes
-  useEffect(() => {
-    if (feeStructures.length > 0) {
-      setIsSelectAll(
-        selectedFeePlanIds.length === feeStructures.length &&
-          feeStructures.every((s) => selectedFeePlanIds.includes(s.id))
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFeePlanIds, feeStructures]);
+  // Import functions are now in useFeePlanImport hook
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-          Fee Plan Management
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">
-          Create and manage fee plans by combining fee categories with category
-          heads
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+            Fee Plan Management
+          </CardTitle>
+          <CardDescription>
+            Create and manage fee plans by combining fee categories with
+            category heads
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Success/Error Messages */}
       {success && (
-        <div className="card-modern rounded-xl p-4 bg-green-50 border-l-4 border-green-400">
-          <p className="text-green-700">{success}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="py-3 px-4">
+            <p className="text-sm text-green-700 font-medium">{success}</p>
+          </CardContent>
+        </Card>
       )}
       {error && (
-        <div className="card-modern rounded-xl p-4 bg-red-50 border-l-4 border-red-400">
-          <p className="text-red-700">{error}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="py-3 px-4">
+            <p className="text-sm text-red-700 font-medium">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Side - Add/Edit Form */}
-        <div className="card-modern rounded-xl p-4 lg:col-span-1">
-          <h2 className="text-lg font-bold text-gray-800 mb-3">
-            {editingStructure ? "Edit Fee Plan" : "Add Fee Plan"}
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                School <span className="text-red-500">*</span>
-              </label>
-              {loadingSchools ? (
-                <div className="flex items-center justify-center py-2">
-                  <FiLoader className="w-4 h-4 animate-spin text-indigo-600" />
-                  <span className="ml-2 text-xs text-gray-600">Loading...</span>
-                </div>
-              ) : (
-                <CustomDropdown
-                  options={schools.map((school) => ({
-                    value: school.id.toString(),
-                    label: school.name,
-                  }))}
-                  value={formData.schoolId?.toString() || ""}
-                  onChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      schoolId: parseInt(value as string),
-                      feeCategoryId: "",
-                      categoryHeadId: null,
-                    })
-                  }
-                  placeholder="Select a school..."
-                  className="w-full"
+        {/* Left Side - Add/Edit Form or Import */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-gray-800 mb-4">
+              {editingStructure ? "Edit Fee Plan" : "Fee Plan Management"}
+            </CardTitle>
+            <Tabs
+              value={mode}
+              onValueChange={(value) => {
+                if (value === "add") {
+                  setMode("add");
+                  setError("");
+                  setSuccess("");
+                  setImportFile(null);
+                  setImportPreview([]);
+                } else if (value === "import") {
+                  setMode("import");
+                  setError("");
+                  setSuccess("");
+                  resetForm();
+                }
+              }}
+            >
+              <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-lg border border-gray-200">
+                <TabsTrigger
+                  value="add"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all font-semibold"
+                >
+                  Add Fee Plan
+                </TabsTrigger>
+                <TabsTrigger
+                  value="import"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all font-semibold"
+                >
+                  Import Fee Plans
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+          <CardContent>
+            <Tabs
+              value={mode}
+              onValueChange={(value) => setMode(value as "add" | "import")}
+            >
+              <TabsContent value="add" className="mt-0">
+                <FeePlanForm
+                  formData={formData}
+                  setFormData={setFormData}
+                  createMode={createMode}
+                  setCreateMode={setCreateMode}
+                  selectedFeeCategoryIds={selectedFeeCategoryIds}
+                  setSelectedFeeCategoryIds={setSelectedFeeCategoryIds}
+                  selectedCategoryHeadIds={selectedCategoryHeadIds}
+                  setSelectedCategoryHeadIds={setSelectedCategoryHeadIds}
+                  selectedClasses={selectedClasses}
+                  setSelectedClasses={setSelectedClasses}
+                  editingStructure={editingStructure}
+                  formResetKey={formResetKey}
+                  handleSubmit={handleSubmit}
+                  handleCancel={handleCancel}
+                  schools={schools}
+                  loadingSchools={loadingSchools}
+                  feeCategories={feeCategories}
+                  loadingCategories={loadingCategories}
+                  categoryHeads={categoryHeads}
+                  loadingCategoryHeads={loadingCategoryHeads}
+                  classOptions={classOptions}
+                  availableClasses={availableClasses}
+                  loadingClasses={loadingClasses}
                 />
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-0.5">
-                <label className="block text-xs font-medium text-gray-700">
-                  Fee Heading <span className="text-red-500">*</span>
-                </label>
-                {formData.schoolId && feeCategories.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCreateMode(
-                        createMode === "single" ? "multiple" : "single"
-                      )
-                    }
-                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                  >
-                    {createMode === "single" ? "Bulk" : "Single"}
-                  </button>
-                )}
-              </div>
-              {!formData.schoolId ? (
-                <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
-                  Select school first
-                </div>
-              ) : loadingCategories ? (
-                <div className="flex items-center justify-center py-1">
-                  <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
-                </div>
-              ) : createMode === "single" ? (
-                <CustomDropdown
-                  options={feeCategories.map((cat) => ({
-                    value: cat.id.toString(),
-                    label: `${cat.name} (${cat.type})`,
-                  }))}
-                  value={formData.feeCategoryId?.toString() || ""}
-                  onChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      feeCategoryId: parseInt(value as string),
-                    })
-                  }
-                  placeholder="Select fee heading..."
-                  className="w-full"
-                  disabled={!formData.schoolId}
-                />
-              ) : (
-                <div className="space-y-1">
-                  <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
-                    {/* Select All */}
-                    <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
-                      <input
-                        type="checkbox"
-                        checked={
-                          feeCategories.length > 0 &&
-                          selectedFeeCategoryIds.length === feeCategories.length
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedFeeCategoryIds(
-                              feeCategories.map((cat) => cat.id)
-                            );
-                          } else {
-                            setSelectedFeeCategoryIds([]);
-                          }
-                        }}
-                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <span className="ml-1.5 text-xs font-semibold text-indigo-700">
-                        All ({feeCategories.length})
-                      </span>
+              </TabsContent>
+              <TabsContent value="import" className="mt-0">
+                <div className="space-y-4">
+                  {/* School Selection for Import */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                      School <span className="text-red-500">*</span>
                     </label>
-                    {feeCategories.map((cat) => (
-                      <label
-                        key={cat.id}
-                        className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedFeeCategoryIds.includes(cat.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedFeeCategoryIds([
-                                ...selectedFeeCategoryIds,
-                                cat.id,
-                              ]);
-                            } else {
-                              setSelectedFeeCategoryIds(
-                                selectedFeeCategoryIds.filter(
-                                  (id) => id !== cat.id
-                                )
-                              );
-                            }
-                          }}
-                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <span className="ml-1.5 text-xs text-gray-700">
-                          {cat.name} ({cat.type})
+                    {loadingSchools ? (
+                      <div className="flex items-center justify-center py-2">
+                        <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
+                        <span className="ml-1.5 text-xs text-gray-600">
+                          Loading...
                         </span>
-                      </label>
-                    ))}
-                  </div>
-                  {createMode === "multiple" &&
-                    selectedFeeCategoryIds.length > 0 && (
-                      <div className="text-xs text-gray-600">
-                        {selectedFeeCategoryIds.length} selected
                       </div>
-                    )}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Amount <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.amount}
-                onChange={(e) =>
-                  setFormData({ ...formData, amount: e.target.value })
-                }
-                placeholder="0.00"
-                required
-                disabled={!formData.schoolId}
-                className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth ${
-                  !formData.schoolId
-                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                    : "bg-white"
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Category Head{" "}
-                <span className="text-gray-400 text-xs">(Optional)</span>
-              </label>
-              {!formData.schoolId ? (
-                <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
-                  Select school first
-                </div>
-              ) : loadingCategoryHeads ? (
-                <div className="flex items-center justify-center py-1">
-                  <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
-                </div>
-              ) : createMode === "single" ? (
-                <CustomDropdown
-                  options={[
-                    { value: "", label: "None (General)" },
-                    ...categoryHeads.map((ch) => ({
-                      value: ch.id.toString(),
-                      label: ch.name,
-                    })),
-                  ]}
-                  value={formData.categoryHeadId?.toString() || ""}
-                  onChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      categoryHeadId: value ? parseInt(value as string) : null,
-                    })
-                  }
-                  placeholder="Select category head..."
-                  className="w-full"
-                  disabled={!formData.schoolId}
-                />
-              ) : (
-                <div className="space-y-1">
-                  <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
-                    {/* Select All */}
-                    {categoryHeads.length > 0 && (
-                      <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
-                        <input
-                          type="checkbox"
-                          checked={
-                            categoryHeads.length > 0 &&
-                            selectedCategoryHeadIds.length ===
-                              categoryHeads.length
-                          }
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedCategoryHeadIds(
-                                categoryHeads.map((ch) => ch.id)
-                              );
-                            } else {
-                              setSelectedCategoryHeadIds([]);
-                            }
-                          }}
-                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <span className="ml-1.5 text-xs font-semibold text-indigo-700">
-                          All ({categoryHeads.length})
-                        </span>
-                      </label>
-                    )}
-                    {categoryHeads.map((ch) => (
-                      <label
-                        key={ch.id}
-                        className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                    ) : (
+                      <Select
+                        value={
+                          importSchoolId && importSchoolId !== ""
+                            ? importSchoolId.toString()
+                            : undefined
+                        }
+                        onValueChange={(value) => {
+                          const schoolId = value ? parseInt(value) : "";
+                          setImportSchoolId(schoolId);
+                          setImportFile(null);
+                          setImportPreview([]);
+                        }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={selectedCategoryHeadIds.includes(ch.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedCategoryHeadIds([
-                                ...selectedCategoryHeadIds,
-                                ch.id,
-                              ]);
-                            } else {
-                              setSelectedCategoryHeadIds(
-                                selectedCategoryHeadIds.filter(
-                                  (id) => id !== ch.id
-                                )
-                              );
-                            }
-                          }}
-                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <span className="ml-1.5 text-xs text-gray-700">
-                          {ch.name}
-                        </span>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a school..." />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {schools.map((school) => (
+                            <SelectItem
+                              key={school.id}
+                              value={school.id.toString()}
+                            >
+                              {school.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {/* Download Sample CSV */}
+                  {importSchoolId && (
+                    <div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={downloadSampleCSV}
+                        className="w-full"
+                      >
+                        <FiDownload className="w-4 h-4 mr-2" />
+                        Download Sample CSV
+                      </Button>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Download a sample CSV template. Use names (not IDs) for
+                        fee categories, category heads, and classes.
+                      </p>
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs font-semibold text-blue-900 mb-1">
+                          CSV Format:
+                        </p>
+                        <ul className="text-xs text-blue-800 space-y-0.5 list-disc list-inside">
+                          <li>
+                            <strong>feeCategoryName</strong> - Name of fee
+                            category (e.g., "Tuition Fee")
+                          </li>
+                          <li>
+                            <strong>categoryHeadName</strong> - Name of category
+                            head (optional, leave empty for "General")
+                          </li>
+                          <li>
+                            <strong>className</strong> - Name of class (e.g.,
+                            "1st", "2nd")
+                          </li>
+                          <li>
+                            <strong>amount</strong> - Fee amount (e.g.,
+                            "5000.00")
+                          </li>
+                          <li>
+                            <strong>status</strong> - "active" or "inactive"
+                          </li>
+                          <li>
+                            <strong>name</strong> - Plan name (optional,
+                            auto-generated if empty)
+                          </li>
+                        </ul>
+                        <p className="text-xs text-blue-700 mt-1 font-medium">
+                          Note: All names must belong to the selected school.
+                          The system will validate and show errors if names
+                          don't match.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* File Upload */}
+                  {importSchoolId && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                        Upload CSV File <span className="text-red-500">*</span>
                       </label>
-                    ))}
-                  </div>
-                  {selectedCategoryHeadIds.length > 0 && (
-                    <div className="text-xs text-gray-600">
-                      {selectedCategoryHeadIds.length} selected
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Class <span className="text-red-500">*</span>
-              </label>
-              {createMode === "single" ? (
-                !formData.schoolId ? (
-                  <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
-                    Select school first
-                  </div>
-                ) : loadingClasses ? (
-                  <div className="flex items-center justify-center py-2">
-                    <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
-                    <span className="ml-1.5 text-xs text-gray-600">
-                      Loading...
-                    </span>
-                  </div>
-                ) : (
-                  <CustomDropdown
-                    options={classOptions.map((cls) => ({
-                      value: cls.name,
-                      label: cls.name,
-                    }))}
-                    value={formData.class || ""}
-                    onChange={(value) => {
-                      setFormData({
-                        ...formData,
-                        class: value as string,
-                      });
-                    }}
-                    placeholder="Select a class..."
-                    className="w-full"
-                  />
-                )
-              ) : (
-                <div className="space-y-1">
-                  {loadingClasses ? (
-                    <div className="flex items-center justify-center py-2">
-                      <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
-                      <span className="ml-1.5 text-xs text-gray-600">
-                        Loading...
-                      </span>
-                    </div>
-                  ) : availableClasses.length === 0 ? (
-                    <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
-                      No classes found
-                    </div>
-                  ) : (
-                    <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
-                      {/* Select All */}
-                      <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
-                        <input
-                          type="checkbox"
-                          checked={
-                            availableClasses.length > 0 &&
-                            selectedClasses.length === availableClasses.length
-                          }
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedClasses([...availableClasses]);
-                            } else {
-                              setSelectedClasses([]);
-                            }
-                          }}
-                          className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <span className="ml-1.5 text-xs font-semibold text-indigo-700">
-                          All ({availableClasses.length})
-                        </span>
-                      </label>
-                      {availableClasses.map((className) => (
-                        <label
-                          key={className}
-                          className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedClasses.includes(className)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedClasses([
-                                  ...selectedClasses,
-                                  className,
-                                ]);
-                              } else {
-                                setSelectedClasses(
-                                  selectedClasses.filter((c) => c !== className)
-                                );
-                              }
-                            }}
-                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="ml-1.5 text-xs text-gray-700">
-                            {className}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {selectedClasses.length > 0 && (
-                    <div className="text-xs text-gray-600">
-                      {selectedClasses.length} selected
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Status <span className="text-red-500">*</span>
-              </label>
-              <CustomDropdown
-                options={[
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                ]}
-                value={formData.status}
-                onChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    status: value as "active" | "inactive",
-                  })
-                }
-                className="w-full"
-                disabled={!formData.schoolId}
-              />
-            </div>
-
-            {/* Preview for multiple mode */}
-            {createMode === "multiple" &&
-              !editingStructure &&
-              selectedFeeCategoryIds.length > 0 &&
-              selectedClasses.length > 0 && (
-                <div className="p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
-                  <p className="text-xs font-semibold text-indigo-900">
-                    Will create{" "}
-                    {selectedFeeCategoryIds.length *
-                      (selectedCategoryHeadIds.length > 0
-                        ? selectedCategoryHeadIds.length
-                        : 1) *
-                      selectedClasses.length}{" "}
-                    plan(s) (duplicates skipped)
-                  </p>
-                </div>
-              )}
-
-            <div className="flex gap-2 pt-1">
-              <button
-                type="submit"
-                disabled={!formData.schoolId}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold shadow transition-all ${
-                  !formData.schoolId
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-md"
-                }`}
-              >
-                {editingStructure
-                  ? "Update"
-                  : createMode === "multiple"
-                  ? `Create ${
-                      selectedFeeCategoryIds.length *
-                      (selectedCategoryHeadIds.length > 0
-                        ? selectedCategoryHeadIds.length
-                        : 1) *
-                      selectedClasses.length
-                    }`
-                  : "Create"}
-              </button>
-              {editingStructure && (
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-smooth"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-            {!formData.schoolId && (
-              <p className="text-xs text-gray-500 text-center mt-1">
-                ⚠️ Select school first
-              </p>
-            )}
-          </form>
-        </div>
-
-        {/* Right Side - List */}
-        <div className="card-modern rounded-xl p-6 lg:col-span-2">
-          {/* Search and Filter */}
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search by name or description..."
-                className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 transition-smooth bg-white"
-              />
-              {search && (
-                <button
-                  onClick={() => {
-                    setSearch("");
-                    setPage(1);
-                  }}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <FiX className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-
-            <div>
-              <CustomDropdown
-                options={[
-                  { value: "", label: "All Schools" },
-                  ...schools.map((school) => ({
-                    value: school.id.toString(),
-                    label: school.name,
-                  })),
-                ]}
-                value={selectedSchoolId?.toString() || ""}
-                onChange={(value) => {
-                  setSelectedSchoolId(value ? parseInt(value as string) : "");
-                  setPage(1);
-                }}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          {/* Table */}
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <FiLoader className="w-8 h-8 animate-spin text-indigo-600" />
-            </div>
-          ) : feeStructures.length === 0 ? (
-            <div className="text-center py-12">
-              <FiDollarSign className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">
-                {search || selectedSchoolId
-                  ? "No fee plans found matching your criteria"
-                  : "No fee plans found. Create one to get started."}
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Bulk Actions Bar */}
-              {selectedFeePlanIds.length > 0 && (
-                <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-indigo-900">
-                      {selectedFeePlanIds.length} fee plan(s) selected
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleExport}
-                      className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-smooth flex items-center gap-2"
-                    >
-                      <FiDownload className="w-4 h-4" />
-                      Export
-                    </button>
-                    <button
-                      onClick={handleBulkDelete}
-                      className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-smooth flex items-center gap-2"
-                    >
-                      <FiTrash2 className="w-4 h-4" />
-                      Delete ({selectedFeePlanIds.length})
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedFeePlanIds([]);
-                        setIsSelectAll(false);
-                      }}
-                      className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-smooth"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-                <table className="w-full">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-12">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isSelectAll}
-                            onChange={(e) => handleSelectAll(e.target.checked)}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                        </label>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Plan Name
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        School
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Category Head
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
-                    {feeStructures.map((structure) => (
-                      <tr
-                        key={structure.id}
-                        className={`hover:bg-indigo-50/50 transition-all duration-150 group ${
-                          selectedFeePlanIds.includes(structure.id)
-                            ? "bg-indigo-50"
-                            : ""
+                      <div
+                        {...getRootProps()}
+                        className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-smooth ${
+                          isDragActive
+                            ? "border-indigo-500 bg-indigo-50"
+                            : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
                         }`}
                       >
-                        <td className="px-4 py-3">
-                          <label className="flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedFeePlanIds.includes(
-                                structure.id
-                              )}
-                              onChange={(e) =>
-                                handleSelectFeePlan(
-                                  structure.id,
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                          </label>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-gray-900">
-                            {structure.name}
-                          </div>
-                          {structure.description && (
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {structure.description}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {structure.school?.name ||
-                            `School ID: ${structure.schoolId}`}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {structure.categoryHead?.name || "General"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="font-semibold text-gray-900">
-                            ₹
-                            {parseFloat(
-                              structure.amount.toString()
-                            ).toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                              structure.status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {structure.status.charAt(0).toUpperCase() +
-                              structure.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleEdit(structure)}
-                              className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-smooth"
-                              title="Edit"
+                        <input {...getInputProps()} />
+                        <FiUpload className="w-6 h-6 mx-auto text-gray-400 mb-2" />
+                        {importFile ? (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-700">
+                              {importFile.name}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImportFile(null);
+                                setImportPreview([]);
+                                setError("");
+                                setSuccess("");
+                              }}
+                              className="mt-1 text-xs"
                             >
-                              <FiEdit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDelete(structure.id, structure.schoolId)
-                              }
-                              className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-smooth"
-                              title="Delete"
-                            >
-                              <FiTrash2 className="w-4 h-4" />
-                            </button>
+                              Remove
+                            </Button>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-gray-600">
+                              {isDragActive
+                                ? "Drop your CSV file here"
+                                : "Drag & drop your CSV file here"}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              or click to browse
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Pagination */}
-              <Pagination
-                paginationMeta={paginationMeta}
-                page={page}
-                limit={limit}
-                onPageChange={setPage}
-                onLimitChange={(newLimit) => {
-                  setLimit(newLimit);
-                  setPage(1);
-                }}
-                itemName="fee plans"
-                className="mt-6"
-              />
-            </>
-          )}
-        </div>
+                  {/* Preview */}
+                  {importPreview.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                        Preview ({importPreview.length} rows)
+                      </label>
+                      <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-2 py-1 text-left">
+                                Fee Category
+                              </th>
+                              <th className="px-2 py-1 text-left">
+                                Category Head
+                              </th>
+                              <th className="px-2 py-1 text-left">Class</th>
+                              <th className="px-2 py-1 text-left">Amount</th>
+                              <th className="px-2 py-1 text-left">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {importPreview.map((row, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="px-2 py-1">
+                                  {row.feeCategoryName ||
+                                    `ID: ${row.feeCategoryId}`}
+                                </td>
+                                <td className="px-2 py-1">
+                                  {row.categoryHeadName || "General"}
+                                </td>
+                                <td className="px-2 py-1">
+                                  {row.className || `ID: ${row.classId}`}
+                                </td>
+                                <td className="px-2 py-1">{row.amount}</td>
+                                <td className="px-2 py-1">{row.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Import Button */}
+                  {importFile && importSchoolId && (
+                    <Button
+                      type="button"
+                      onClick={handleBulkImport}
+                      disabled={isImporting}
+                      className="w-full"
+                    >
+                      {isImporting ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <FiLoader className="w-4 h-4 animate-spin" />
+                          Importing...
+                        </span>
+                      ) : (
+                        "Import Fee Plans"
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Import Results */}
+                  {importResult && (
+                    <div className="space-y-2">
+                      {importResult.success > 0 && (
+                        <Card className="border-l-4 border-l-green-400 bg-green-50">
+                          <CardContent className="py-2 px-3">
+                            <p className="text-xs font-semibold text-green-800">
+                              Successfully imported: {importResult.success} fee
+                              plan(s)
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {importResult.skipped > 0 && (
+                        <Card className="border-l-4 border-l-yellow-400 bg-yellow-50">
+                          <CardContent className="py-2 px-3">
+                            <p className="text-xs font-semibold text-yellow-800 mb-1">
+                              Skipped (duplicates): {importResult.skipped} fee
+                              plan(s)
+                            </p>
+                            <div className="max-h-24 overflow-y-auto text-xs text-yellow-700">
+                              {importResult.duplicates.map((dup, idx) => (
+                                <div key={idx} className="mb-0.5">
+                                  Row {dup.row} - "{dup.name}": {dup.reason}
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {importResult.failed > 0 && (
+                        <Card className="border-l-4 border-l-red-400 bg-red-50">
+                          <CardContent className="py-2 px-3">
+                            <p className="text-xs font-semibold text-red-800 mb-1">
+                              Failed: {importResult.failed} fee plan(s)
+                            </p>
+                            <div className="max-h-24 overflow-y-auto text-xs text-red-700">
+                              {importResult.errors.map((err, idx) => (
+                                <div key={idx} className="mb-0.5">
+                                  Row {err.row}: {err.error}
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Right Side - List */}
+        <Card className="lg:col-span-2">
+          <CardContent className="pt-6">
+            {/* Search and Filter */}
+            <FeePlanFilters
+              search={search}
+              setSearch={setSearch}
+              selectedSchoolId={selectedSchoolId}
+              setSelectedSchoolId={setSelectedSchoolId}
+              schools={schools}
+              setPage={setPage}
+            />
+
+            {/* Table */}
+            <FeePlanTable
+              feeStructures={feeStructures}
+              loading={loading}
+              paginationMeta={paginationMeta}
+              page={page}
+              limit={limit}
+              setPage={setPage}
+              setLimit={setLimit}
+              search={search}
+              selectedSchoolId={selectedSchoolId}
+              selectedFeePlanIds={selectedFeePlanIds}
+              setSelectedFeePlanIds={setSelectedFeePlanIds}
+              setIsSelectAll={setIsSelectAll}
+              isSelectAll={isSelectAll}
+              handleSelectAll={handleSelectAll}
+              handleSelectFeePlan={handleSelectFeePlan}
+              handleEdit={handleEdit}
+              handleDeleteClick={handleDeleteClick}
+              handleExport={handleExport}
+              handleBulkDeleteClick={handleBulkDeleteClick}
+            />
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Dialogs */}
+      <FeePlanDialogs
+        deleteDialogOpen={deleteDialogOpen}
+        setDeleteDialogOpen={setDeleteDialogOpen}
+        setDeleteItem={setDeleteItem}
+        handleDelete={handleDelete}
+        bulkDeleteDialogOpen={bulkDeleteDialogOpen}
+        setBulkDeleteDialogOpen={setBulkDeleteDialogOpen}
+        selectedFeePlanIds={selectedFeePlanIds}
+        handleBulkDeleteWithDialog={handleBulkDeleteWithDialog}
+      />
     </div>
   );
 }

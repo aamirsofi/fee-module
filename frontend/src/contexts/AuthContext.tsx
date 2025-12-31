@@ -49,7 +49,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
             } catch (error) {
               // Silently fail - school might not exist or user doesn't have access
-              console.warn('Failed to fetch school subdomain:', error);
             }
           }
         } catch (error) {
@@ -79,7 +78,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.setItem('school_subdomain', school.subdomain);
         }
       } catch (error) {
-        console.warn('Failed to fetch school subdomain:', error);
         // Don't fail login if school fetch fails
       }
     }
