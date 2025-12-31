@@ -18,6 +18,8 @@ import { SuperAdminModule } from './super-admin/super-admin.module';
 import { CategoryHeadsModule } from './category-heads/category-heads.module';
 import { ClassesModule } from './classes/classes.module';
 import { RoutesModule } from './routes/routes.module';
+import { AcademicYearsModule } from './academic-years/academic-years.module';
+import { StudentAcademicRecordsModule } from './student-academic-records/student-academic-records.module';
 import { DatabaseConfig } from './database/database.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -61,6 +63,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     CategoryHeadsModule,
     ClassesModule,
     RoutesModule,
+    AcademicYearsModule,
+    StudentAcademicRecordsModule,
   ],
   controllers: [AppController],
   providers: [

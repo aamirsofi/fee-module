@@ -1,7 +1,9 @@
 # Student Data Structure Proposal
 
 ## Problem Statement
+
 Student information has fields that change every academic year (class, section, fee structures, etc.). We need a structure that:
+
 - Preserves historical data
 - Makes current year data easily accessible
 - Supports year-over-year reporting
@@ -10,8 +12,9 @@ Student information has fields that change every academic year (class, section, 
 ## Proposed Solution: Academic Year-Based Structure
 
 ### 1. AcademicYear Entity (NEW)
+
 ```typescript
-@Entity('academic_years')
+@Entity("academic_years")
 export class AcademicYear {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -19,10 +22,10 @@ export class AcademicYear {
   @Column({ length: 50, unique: true })
   name!: string; // e.g., "2024-2025"
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   startDate!: Date;
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   endDate!: Date;
 
   @Column({ default: false })
@@ -32,10 +35,10 @@ export class AcademicYear {
   schoolId!: number;
 
   @ManyToOne(() => School)
-  @JoinColumn({ name: 'schoolId' })
+  @JoinColumn({ name: "schoolId" })
   school!: School;
 
-  @OneToMany(() => StudentAcademicRecord, record => record.academicYear)
+  @OneToMany(() => StudentAcademicRecord, (record) => record.academicYear)
   studentRecords!: StudentAcademicRecord[];
 
   @CreateDateColumn()
@@ -47,9 +50,10 @@ export class AcademicYear {
 ```
 
 ### 2. StudentAcademicRecord Entity (NEW)
+
 ```typescript
-@Entity('student_academic_records')
-@Unique(['studentId', 'academicYearId']) // One record per student per year
+@Entity("student_academic_records")
+@Unique(["studentId", "academicYearId"]) // One record per student per year
 export class StudentAcademicRecord {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -73,28 +77,28 @@ export class StudentAcademicRecord {
   admissionNumber?: string; // If new admission in this year
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: AcademicRecordStatus,
     default: AcademicRecordStatus.ACTIVE,
   })
   status!: AcademicRecordStatus; // ACTIVE, PROMOTED, REPEATING, TRANSFERRED, DROPPED
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   remarks?: string;
 
-  @ManyToOne(() => Student, student => student.academicRecords)
-  @JoinColumn({ name: 'studentId' })
+  @ManyToOne(() => Student, (student) => student.academicRecords)
+  @JoinColumn({ name: "studentId" })
   student!: Student;
 
   @ManyToOne(() => AcademicYear)
-  @JoinColumn({ name: 'academicYearId' })
+  @JoinColumn({ name: "academicYearId" })
   academicYear!: AcademicYear;
 
   @ManyToOne(() => Class)
-  @JoinColumn({ name: 'classId' })
+  @JoinColumn({ name: "classId" })
   class!: Class;
 
-  @OneToMany(() => StudentFeeStructure, sfs => sfs.academicRecord)
+  @OneToMany(() => StudentFeeStructure, (sfs) => sfs.academicRecord)
   feeStructures!: StudentFeeStructure[];
 
   @CreateDateColumn()
@@ -105,17 +109,18 @@ export class StudentAcademicRecord {
 }
 
 enum AcademicRecordStatus {
-  ACTIVE = 'active',
-  PROMOTED = 'promoted',
-  REPEATING = 'repeating',
-  TRANSFERRED = 'transferred',
-  DROPPED = 'dropped',
+  ACTIVE = "active",
+  PROMOTED = "promoted",
+  REPEATING = "repeating",
+  TRANSFERRED = "transferred",
+  DROPPED = "dropped",
 }
 ```
 
 ### 3. Updated Student Entity
+
 ```typescript
-@Entity('students')
+@Entity("students")
 export class Student {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -130,7 +135,7 @@ export class Student {
   @Column({ length: 255 })
   lastName!: string;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ type: "date", nullable: true })
   dateOfBirth?: Date;
 
   @Column({ nullable: true, length: 20 })
@@ -145,10 +150,10 @@ export class Student {
   @Column({ nullable: true, length: 255 })
   phone?: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   address?: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   admissionDate!: Date; // First admission date
 
   @Column({ nullable: true, length: 255 })
@@ -172,7 +177,7 @@ export class Student {
 
   // Overall Status (not year-specific)
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: StudentStatus,
     default: StudentStatus.ACTIVE,
   })
@@ -182,25 +187,29 @@ export class Student {
   schoolId!: number;
 
   // Relations
-  @ManyToOne(() => School, school => school.students)
-  @JoinColumn({ name: 'schoolId' })
+  @ManyToOne(() => School, (school) => school.students)
+  @JoinColumn({ name: "schoolId" })
   school!: School;
 
   @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: "userId" })
   user?: User;
 
-  @OneToMany(() => StudentAcademicRecord, record => record.student)
+  @OneToMany(() => StudentAcademicRecord, (record) => record.student)
   academicRecords!: StudentAcademicRecord[];
 
-  @OneToMany(() => Payment, payment => payment.student)
+  @OneToMany(() => Payment, (payment) => payment.student)
   payments!: Payment[];
 
   // Helper method to get current academic record
   getCurrentAcademicRecord(): StudentAcademicRecord | null {
-    return this.academicRecords?.find(
-      record => record.academicYear.isCurrent && record.status === AcademicRecordStatus.ACTIVE
-    ) || null;
+    return (
+      this.academicRecords?.find(
+        (record) =>
+          record.academicYear.isCurrent &&
+          record.status === AcademicRecordStatus.ACTIVE
+      ) || null
+    );
   }
 
   @CreateDateColumn()
@@ -212,9 +221,10 @@ export class Student {
 ```
 
 ### 4. Updated StudentFeeStructure Entity
+
 ```typescript
-@Entity('student_fee_structures')
-@Unique(['studentId', 'feeStructureId', 'academicYearId'])
+@Entity("student_fee_structures")
+@Unique(["studentId", "feeStructureId", "academicYearId"])
 export class StudentFeeStructure {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -231,33 +241,33 @@ export class StudentFeeStructure {
   @Column({ nullable: true })
   academicRecordId?: number; // NEW: Link to student's academic record for that year
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   amount!: number;
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   dueDate!: Date;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: PaymentStatus,
     default: PaymentStatus.PENDING,
   })
   status!: PaymentStatus;
 
-  @ManyToOne(() => Student, student => student.feeStructures)
-  @JoinColumn({ name: 'studentId' })
+  @ManyToOne(() => Student, (student) => student.feeStructures)
+  @JoinColumn({ name: "studentId" })
   student!: Student;
 
   @ManyToOne(() => FeeStructure)
-  @JoinColumn({ name: 'feeStructureId' })
+  @JoinColumn({ name: "feeStructureId" })
   feeStructure!: FeeStructure;
 
   @ManyToOne(() => AcademicYear)
-  @JoinColumn({ name: 'academicYearId' })
+  @JoinColumn({ name: "academicYearId" })
   academicYear!: AcademicYear;
 
   @ManyToOne(() => StudentAcademicRecord, { nullable: true })
-  @JoinColumn({ name: 'academicRecordId' })
+  @JoinColumn({ name: "academicRecordId" })
   academicRecord?: StudentAcademicRecord;
 
   @CreateDateColumn()
@@ -289,6 +299,7 @@ export class StudentFeeStructure {
 ## Usage Examples
 
 ### Get Student's Current Class
+
 ```typescript
 const student = await studentService.findOne(id);
 const currentRecord = student.getCurrentAcademicRecord();
@@ -296,13 +307,15 @@ const currentClass = currentRecord?.class.name; // "10th"
 ```
 
 ### Get Student's Class for Specific Year
+
 ```typescript
 const record2024 = student.academicRecords.find(
-  r => r.academicYear.name === "2024-2025"
+  (r) => r.academicYear.name === "2024-2025"
 );
 ```
 
 ### Promote Student to Next Class
+
 ```typescript
 // Create new academic record for next year
 const nextYear = await academicYearService.getNextYear();
@@ -323,4 +336,3 @@ const newRecord = await studentAcademicRecordService.create({
 4. Update StudentFeeStructure entity
 5. Create migration scripts
 6. Update frontend to use new structure
-

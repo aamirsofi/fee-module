@@ -1,4 +1,4 @@
-import { IsString, MinLength, IsEmail, IsOptional, IsEnum } from 'class-validator';
+import { IsString, MinLength, IsEmail, IsOptional, IsEnum, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { StudentStatus } from '../entities/student.entity';
 
@@ -22,6 +22,21 @@ export class CreateStudentDto {
   @IsEmail()
   email!: string;
 
+  @ApiProperty({ required: false, example: '2005-05-15' })
+  @IsDateString()
+  @IsOptional()
+  dateOfBirth?: string;
+
+  @ApiProperty({ required: false, example: 'male' })
+  @IsString()
+  @IsOptional()
+  gender?: string;
+
+  @ApiProperty({ required: false, example: 'O+' })
+  @IsString()
+  @IsOptional()
+  bloodGroup?: string;
+
   @ApiProperty({ required: false, example: '+1234567890' })
   @IsString()
   @IsOptional()
@@ -32,14 +47,39 @@ export class CreateStudentDto {
   @IsOptional()
   address?: string;
 
-  @ApiProperty({ example: '10th Grade' })
-  @IsString()
-  class!: string;
+  @ApiProperty({ example: '2024-04-01' })
+  @IsDateString()
+  admissionDate!: string;
 
-  @ApiProperty({ required: false, example: 'A' })
+  @ApiProperty({ required: false, example: 'ADM001' })
   @IsString()
   @IsOptional()
-  section?: string;
+  admissionNumber?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  photoUrl?: string;
+
+  @ApiProperty({ required: false, example: 'John Doe Sr.' })
+  @IsString()
+  @IsOptional()
+  parentName?: string;
+
+  @ApiProperty({ required: false, example: 'parent@example.com' })
+  @IsEmail()
+  @IsOptional()
+  parentEmail?: string;
+
+  @ApiProperty({ required: false, example: '+1234567890' })
+  @IsString()
+  @IsOptional()
+  parentPhone?: string;
+
+  @ApiProperty({ required: false, example: 'father' })
+  @IsString()
+  @IsOptional()
+  parentRelation?: string;
 
   @ApiProperty({ enum: StudentStatus, required: false })
   @IsEnum(StudentStatus)

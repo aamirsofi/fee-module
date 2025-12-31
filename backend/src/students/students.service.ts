@@ -43,8 +43,8 @@ export class StudentsService {
     if (!createStudentDto.email || !createStudentDto.email.trim()) {
       throw new BadRequestException('Email is required');
     }
-    if (!createStudentDto.class || !createStudentDto.class.trim()) {
-      throw new BadRequestException('Class is required');
+    if (!createStudentDto.admissionDate) {
+      throw new BadRequestException('Admission date is required');
     }
 
     // Check if studentId already exists for this school
@@ -76,12 +76,21 @@ export class StudentsService {
         firstName: createStudentDto.firstName.trim(),
         lastName: createStudentDto.lastName.trim(),
         email: createStudentDto.email.trim().toLowerCase(),
+        dateOfBirth: createStudentDto.dateOfBirth ? new Date(createStudentDto.dateOfBirth) : null,
+        gender: createStudentDto.gender?.trim() || null,
+        bloodGroup: createStudentDto.bloodGroup?.trim() || null,
         phone: createStudentDto.phone?.trim() || null,
         address: createStudentDto.address?.trim() || null,
-        class: createStudentDto.class.trim(),
-        section: createStudentDto.section?.trim() || null,
+        admissionDate: new Date(createStudentDto.admissionDate),
+        admissionNumber: createStudentDto.admissionNumber?.trim() || null,
+        photoUrl: createStudentDto.photoUrl?.trim() || null,
+        parentName: createStudentDto.parentName?.trim() || null,
+        parentEmail: createStudentDto.parentEmail?.trim().toLowerCase() || null,
+        parentPhone: createStudentDto.parentPhone?.trim() || null,
+        parentRelation: createStudentDto.parentRelation?.trim() || null,
         status: status as any,
         schoolId,
+        userId: createStudentDto.userId || null,
       } as Student);
       return await this.studentsRepository.save(student);
     } catch (error: any) {
@@ -134,7 +143,7 @@ export class StudentsService {
     }
     return await this.studentsRepository.find({
       where,
-      relations: ['school', 'user'],
+      relations: ['school', 'user', 'academicRecords', 'academicRecords.academicYear', 'academicRecords.class'],
       order: { createdAt: 'desc' },
     });
   }
@@ -146,7 +155,15 @@ export class StudentsService {
     }
     const student = await this.studentsRepository.findOne({
       where,
-      relations: ['school', 'user', 'payments', 'feeStructures'],
+      relations: [
+        'school',
+        'user',
+        'academicRecords',
+        'academicRecords.academicYear',
+        'academicRecords.class',
+        'payments',
+        'feeStructures',
+      ],
     });
 
     if (!student) {
