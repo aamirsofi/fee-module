@@ -5,7 +5,6 @@ import {
   FiDollarSign,
   FiUsers,
   FiMapPin,
-  FiCreditCard,
   FiTrendingUp,
   FiLoader,
 } from 'react-icons/fi';
@@ -43,7 +42,7 @@ export default function SuperAdminDashboard() {
       const response = await api.instance.get('/super-admin/dashboard');
       setStats(response.data);
     } catch (error) {
-      console.error('Failed to load dashboard stats:', error);
+      // Silently fail - stats are not critical for page functionality
     } finally {
       setLoading(false);
     }

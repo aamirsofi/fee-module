@@ -39,7 +39,7 @@ export default function Register() {
 
     try {
       setLoading(true);
-      const response = await authService.register({
+      await authService.register({
         name,
         email,
         password,

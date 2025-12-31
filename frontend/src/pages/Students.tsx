@@ -76,11 +76,7 @@ export default function Students() {
       setError(errorMessage);
       
       // If error mentions school context, provide helpful guidance
-      if (errorMessage.includes('School context') || errorMessage.includes('school')) {
-        console.error('School context error:', errorMessage);
-        console.log('User object:', JSON.parse(localStorage.getItem('user') || '{}'));
-        console.log('School subdomain:', localStorage.getItem('school_subdomain'));
-      }
+      // Error message is already displayed to user via setError()
       
       // Don't close modal on error so user can fix and retry
     }

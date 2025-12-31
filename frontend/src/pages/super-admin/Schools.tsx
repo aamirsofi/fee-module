@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FiEdit,
-  FiTrash2,
   FiLoader,
   FiHome,
   FiEye,
@@ -76,12 +75,7 @@ export default function SuperAdminSchools() {
   const [schoolToAction, setSchoolToAction] = useState<School | null>(null);
 
   // Fetch schools with TanStack Query - Backend handles pagination and filtering
-  const {
-    data: schoolsData,
-    isLoading: loading,
-    refetch: refetchSchools,
-    error: queryError,
-  } = useQuery({
+  const { data: schoolsData, isLoading: loading } = useQuery({
     queryKey: ["schools", page, limit, search, statusFilter],
     queryFn: async () => {
       // Note: By default, we only show active schools to prevent accidentally adding data to inactive/suspended schools

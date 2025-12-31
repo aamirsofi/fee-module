@@ -134,9 +134,6 @@ export default function SuperAdminUsers() {
         setPaginationMeta(response.data.meta);
       } else if (Array.isArray(response.data)) {
         // Fallback for old format (array)
-        console.warn(
-          "Received old format (array), converting to paginated format"
-        );
         // Filter out super_admin users (fallback for old backend)
         const filteredUsers = response.data.filter(
           (user: User) => user.role !== "super_admin"
@@ -152,12 +149,10 @@ export default function SuperAdminUsers() {
         });
       } else {
         // Handle unexpected format
-        console.error("Unexpected response format:", response.data);
         setUsers([]);
         setPaginationMeta(null);
       }
     } catch (err: any) {
-      console.error("Error loading users:", err);
       setError(err.response?.data?.message || "Failed to load users");
     } finally {
       setLoading(false);

@@ -320,8 +320,7 @@ export default function FeePlan() {
                 // Likely a duplicate, skip it
                 failedNames.push(planName);
               } else {
-                // Other error, log it
-                console.error(`Failed to create ${planName}:`, err);
+                // Other error, add to failed list
                 failedNames.push(planName);
               }
             }
