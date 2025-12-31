@@ -239,34 +239,74 @@ export default function Layout({ children }: LayoutProps) {
     };
   }, []);
 
-  // Helper function to recursively check if any child is active
-  const hasActiveChildRecursive = (children: any[]): boolean => {
-    return children.some((child) => {
+  // Helper function to recursively check if any child is active and collect nested sections
+  const hasActiveChildRecursive = (
+    children: Array<{
+      path?: string;
+      section?: string;
+      children?: Array<{ path?: string; section?: string; children?: any[] }>;
+    }>,
+    nestedSections: Set<string> = new Set()
+  ): { hasActive: boolean; nestedSections: Set<string> } => {
+    let hasActive = false;
+
+    for (const child of children) {
       if (child.path && isActive(child.path)) {
-        return true;
+        hasActive = true;
       }
-      if (child.children) {
-        return hasActiveChildRecursive(child.children);
+      // If this child has a section property, check if it has active children
+      if (child.section) {
+        nestedSections.add(child.section);
+        // Recursively check nested children to see if this nested section should be expanded
+        if (child.children) {
+          const nestedResult = hasActiveChildRecursive(
+            child.children,
+            nestedSections
+          );
+          // If nested children are active, mark this nested section for expansion
+          if (nestedResult.hasActive) {
+            hasActive = true;
+          }
+        }
+      } else if (child.children) {
+        const result = hasActiveChildRecursive(child.children, nestedSections);
+        hasActive = hasActive || result.hasActive;
       }
-      return false;
-    });
+    }
+
+    return { hasActive, nestedSections };
   };
 
   // Auto-expand only the active section, collapse all others
   useEffect(() => {
     if (isSuperAdmin) {
       const newExpandedSections: Record<string, boolean> = {};
+      const nestedSectionsToExpand = new Set<string>();
 
       superAdminSections.forEach((section) => {
         if (section.section && section.children) {
           // Recursively check if any child (at any level) is active
-          const hasActive = hasActiveChildRecursive(section.children);
+          const { hasActive, nestedSections } = hasActiveChildRecursive(
+            section.children
+          );
           // Only expand the section that has an active child, collapse all others
           newExpandedSections[section.section] = hasActive;
+
+          // If this section has active children, also expand its nested sections
+          if (hasActive) {
+            nestedSections.forEach((nestedSection) => {
+              nestedSectionsToExpand.add(nestedSection);
+            });
+          }
         }
       });
 
-      // Update all sections at once - collapse inactive ones, expand active one
+      // Expand nested sections that have active children
+      nestedSectionsToExpand.forEach((nestedSection) => {
+        newExpandedSections[nestedSection] = true;
+      });
+
+      // Update all sections at once - collapse inactive ones, expand active ones
       setExpandedSections((prev) => ({
         ...prev,
         ...newExpandedSections,
