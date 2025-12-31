@@ -13,6 +13,7 @@ import { FeeCategory } from '../../fee-categories/entities/fee-category.entity';
 import { CategoryHead } from '../../category-heads/entities/category-head.entity';
 import { Payment } from '../../payments/entities/payment.entity';
 import { StudentFeeStructure } from '../../student-fee-structures/entities/student-fee-structure.entity';
+import { Class } from '../../classes/entities/class.entity';
 
 export enum StructureStatus {
   ACTIVE = 'active',
@@ -39,8 +40,12 @@ export class FeeStructure {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount!: number;
 
-  @Column({ nullable: true, length: 255 })
-  class?: string;
+  @Column({ nullable: true })
+  classId?: number;
+
+  @ManyToOne(() => Class, { nullable: true })
+  @JoinColumn({ name: 'classId' })
+  class?: Class;
 
   @Column({ nullable: true, length: 255 })
   academicYear?: string;

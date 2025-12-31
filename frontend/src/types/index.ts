@@ -57,8 +57,6 @@ export interface Student {
 
 export type FeeCategoryType = 'school' | 'transport';
 
-export type CategoryHead = 'general' | 'sponsored';
-
 export interface FeeCategory {
   id: number;
   name: string;
@@ -79,7 +77,7 @@ export interface FeeStructure {
   name: string;
   description?: string;
   amount: number;
-  class?: string;
+  classId?: number;
   academicYear: string;
   dueDate?: string;
   status: 'active' | 'inactive';

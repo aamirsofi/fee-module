@@ -35,10 +35,10 @@ export class CreateFeeStructureDto {
   @Min(0)
   amount!: number;
 
-  @ApiProperty({ required: false, example: '10th Grade' })
-  @IsString()
+  @ApiProperty({ required: false, example: 1 })
+  @IsNumber()
   @IsOptional()
-  class?: string;
+  classId?: number;
 
   @ApiProperty({ required: false, example: '2024-2025' })
   @IsString()

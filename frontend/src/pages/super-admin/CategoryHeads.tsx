@@ -11,6 +11,7 @@ import {
 } from "react-icons/fi";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface CategoryHead {
   id: number;
@@ -270,14 +271,16 @@ export default function CategoryHeads() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-          Category Heads Management
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">
-          Manage category heads (e.g., General, Sponsored) for fee plans
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+            Category Heads Management
+          </CardTitle>
+          <CardDescription>
+            Manage category heads (e.g., General, Sponsored) for fee plans
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Success/Error Messages - Below header banner */}
       {success && (

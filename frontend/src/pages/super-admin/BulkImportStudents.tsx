@@ -4,6 +4,8 @@ import { FiUpload, FiArrowLeft, FiLoader } from "react-icons/fi";
 import api from "../../services/api";
 import StudentBulkImport from "../../components/StudentBulkImport";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface School {
   id: number;
@@ -70,24 +72,28 @@ export default function BulkImportStudents() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/super-admin/schools")}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-smooth"
-          >
-            <FiArrowLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-              Bulk Import Students
-            </h1>
-            <p className="text-gray-600 text-sm mt-0.5">
-              Import multiple students from a CSV file
-            </p>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/super-admin/schools")}
+              className="h-auto p-1.5"
+            >
+              <FiArrowLeft className="w-4 h-4 text-gray-600" />
+            </Button>
+            <div>
+              <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+                Bulk Import Students
+              </CardTitle>
+              <CardDescription>
+                Import multiple students from a CSV file
+              </CardDescription>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardHeader>
+      </Card>
 
       {/* Success/Error Messages */}
       {success && (

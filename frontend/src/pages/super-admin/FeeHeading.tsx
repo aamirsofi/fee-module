@@ -13,6 +13,12 @@ import { useDropzone } from "react-dropzone";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import Pagination from "../../components/Pagination";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 interface FeeCategory {
   id: number;
@@ -760,14 +766,16 @@ export default function FeeHeading() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-          Fee Heading Management
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">
-          Manage fee categories (headings) for schools
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+            Fee Heading Management
+          </CardTitle>
+          <CardDescription>
+            Manage fee categories (headings) for schools
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Success/Error Messages - Below header banner */}
       {success && (
@@ -783,7 +791,7 @@ export default function FeeHeading() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side - Add/Edit Form or Import */}
-        <div className="card-modern rounded-xl p-6 lg:col-span-1">
+        <div className="card-modern rounded-xl p-4 lg:col-span-1">
           {/* Tabs */}
           <div className="flex gap-2 mb-4 border-b border-gray-200">
             <button
@@ -1251,7 +1259,7 @@ export default function FeeHeading() {
         </div>
 
         {/* Right Side - List */}
-        <div className="card-modern rounded-xl p-6 lg:col-span-2">
+        <div className="card-modern rounded-xl p-4 lg:col-span-2">
           {/* Search and Filter */}
           <div className="mb-4 space-y-3">
             <div className="relative">

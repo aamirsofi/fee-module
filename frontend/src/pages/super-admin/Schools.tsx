@@ -12,6 +12,10 @@ import {
 } from "react-icons/fi";
 import api from "../../services/api";
 import { School } from "../../types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface PaginationMeta {
   total: number;
@@ -193,60 +197,69 @@ export default function SuperAdminSchools() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
             Schools Management
-          </h1>
-          <p className="text-gray-600 text-sm mt-1">
+          </CardTitle>
+          <CardDescription>
             Manage all schools in the system
-          </p>
-        </div>
-      </div>
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
-      {/* Success Message - At the top */}
+      {/* Success Message */}
       {success && (
-        <div className="card-modern rounded-xl p-3 bg-green-50 border-l-2 border-green-400">
-          <p className="text-sm text-green-700">{success}</p>
-        </div>
+        <Card className="border-l-4 border-l-green-400 bg-green-50">
+          <CardContent className="pt-6">
+            <p className="text-sm text-green-700">{success}</p>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Error Message - At the top */}
+      {/* Error Message */}
       {error && (
-        <div className="card-modern rounded-xl p-3 bg-red-50 border-l-2 border-red-400">
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
+        <Card className="border-l-4 border-l-red-400 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-sm text-red-700">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Split Layout: Form on Left, List on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side - Add/Edit Form */}
         <div className="lg:col-span-1">
-          <div className="card-modern rounded-xl p-4 sticky top-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-gray-800">
-                {editingSchool ? "Edit School" : "Add School"}
-              </h2>
-              {editingSchool && (
-                <button
-                  onClick={resetForm}
-                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-smooth"
-                  title="Cancel editing"
-                >
-                  <FiX className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+          <Card className="sticky top-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold text-gray-800">
+                  {editingSchool ? "Edit School" : "Add School"}
+                </CardTitle>
+                {editingSchool && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetForm}
+                    className="h-auto p-1 text-gray-400 hover:text-gray-600"
+                    title="Cancel editing"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   School Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
+                  className="text-sm"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
@@ -257,10 +270,10 @@ export default function SuperAdminSchools() {
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Subdomain *
                 </label>
-                <input
+                <Input
                   type="text"
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
+                  className="text-sm font-mono"
                   value={formData.subdomain}
                   onChange={(e) =>
                     setFormData({ ...formData, subdomain: e.target.value })
@@ -271,9 +284,9 @@ export default function SuperAdminSchools() {
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Email
                 </label>
-                <input
+                <Input
                   type="email"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
+                  className="text-sm"
                   value={formData.email}
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
@@ -284,9 +297,9 @@ export default function SuperAdminSchools() {
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Phone
                 </label>
-                <input
+                <Input
                   type="tel"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-smooth bg-white"
+                  className="text-sm"
                   value={formData.phone}
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
@@ -324,29 +337,31 @@ export default function SuperAdminSchools() {
                 </select>
               </div>
               <div className="flex gap-2 pt-1">
-                <button
+                <Button
                   type="submit"
-                  className="btn-primary flex-1 text-sm py-2"
+                  className="flex-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
                 >
                   {editingSchool ? "Update" : "Create"}
-                </button>
+                </Button>
                 {editingSchool && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={resetForm}
-                    className="btn-secondary text-sm py-2 px-4"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 )}
               </div>
             </form>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Side - Schools List */}
         <div className="lg:col-span-2">
-          <div className="card-modern rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+          <Card>
+            <CardContent className="pt-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <FiLoader className="w-8 h-8 animate-spin text-indigo-600" />
@@ -397,41 +412,56 @@ export default function SuperAdminSchools() {
                             )}
                           </td>
                           <td className="px-4 py-2">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full ${
+                            <Badge
+                              variant={
                                 school.status === "active"
-                                  ? "bg-green-100 text-green-700 border border-green-200"
+                                  ? "default"
                                   : school.status === "suspended"
-                                  ? "bg-red-100 text-red-700 border border-red-200"
-                                  : "bg-gray-100 text-gray-700 border border-gray-200"
-                              }`}
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                              className={
+                                school.status === "active"
+                                  ? "bg-green-100 text-green-700 border-green-200"
+                                  : school.status === "suspended"
+                                  ? "bg-red-100 text-red-700 border-red-200"
+                                  : "bg-gray-100 text-gray-700 border-gray-200"
+                              }
                             >
                               {school.status}
-                            </span>
+                            </Badge>
                           </td>
                           <td className="px-4 py-2">
                             <div className="flex items-center gap-1.5">
-                              <Link
-                                to={`/super-admin/schools/${school.id}/details`}
-                                className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-all duration-150 hover:scale-110"
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                className="p-2 text-blue-600 hover:bg-blue-100"
                                 title="View Details"
                               >
-                                <FiEye className="w-4 h-4" />
-                              </Link>
-                              <button
+                                <Link to={`/super-admin/schools/${school.id}/details`}>
+                                  <FiEye className="w-4 h-4" />
+                                </Link>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleEdit(school)}
-                                className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-md transition-all duration-150 hover:scale-110"
+                                className="p-2 text-indigo-600 hover:bg-indigo-100"
                                 title="Edit"
                               >
                                 <FiEdit className="w-4 h-4" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleDelete(school.id)}
-                                className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-all duration-150 hover:scale-110"
+                                className="p-2 text-red-600 hover:bg-red-100"
                                 title="Delete"
                               >
                                 <FiTrash2 className="w-4 h-4" />
-                              </button>
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -559,7 +589,8 @@ export default function SuperAdminSchools() {
                 )}
               </>
             )}
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

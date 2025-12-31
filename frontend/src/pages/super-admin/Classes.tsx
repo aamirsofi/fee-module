@@ -13,6 +13,7 @@ import { useDropzone } from "react-dropzone";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import Pagination from "../../components/Pagination";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface Class {
   id: number;
@@ -508,14 +509,16 @@ export default function Classes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-          Class Management
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">
-          Create and manage classes for schools
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+            Class Management
+          </CardTitle>
+          <CardDescription>
+            Create and manage classes for schools
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Success/Error Messages */}
       {success && (

@@ -20,6 +20,7 @@ import { UpdateFeeCategoryDto } from '../fee-categories/dto/update-fee-category.
 import { CreateFeeStructureDto } from '../fee-structures/dto/create-fee-structure.dto';
 import { UpdateFeeStructureDto } from '../fee-structures/dto/update-fee-structure.dto';
 import { CategoryHead } from '../category-heads/entities/category-head.entity';
+import { Class } from '../classes/entities/class.entity';
 
 @Injectable()
 export class SuperAdminService {
@@ -38,6 +39,8 @@ export class SuperAdminService {
     private feeCategoriesRepository: Repository<FeeCategory>,
     @InjectRepository(CategoryHead)
     private categoryHeadsRepository: Repository<CategoryHead>,
+    @InjectRepository(Class)
+    private classesRepository: Repository<Class>,
     private schoolsService: SchoolsService,
     private usersService: UsersService,
   ) {}
@@ -722,7 +725,8 @@ export class SuperAdminService {
       .createQueryBuilder('fs')
       .leftJoinAndSelect('fs.school', 'school')
       .leftJoinAndSelect('fs.category', 'category')
-      .leftJoinAndSelect('fs.categoryHead', 'categoryHead');
+      .leftJoinAndSelect('fs.categoryHead', 'categoryHead')
+      .leftJoinAndSelect('fs.class', 'class');
 
     // Apply filters
     if (schoolId) {
@@ -762,7 +766,7 @@ export class SuperAdminService {
   async getFeeStructureById(id: number) {
     const feeStructure = await this.feeStructuresRepository.findOne({
       where: { id },
-      relations: ['school', 'category', 'categoryHead'],
+      relations: ['school', 'category', 'categoryHead', 'class'],
     });
 
     if (!feeStructure) {
@@ -845,7 +849,7 @@ export class SuperAdminService {
   ) {
     const feeStructure = await this.feeStructuresRepository.findOne({
       where: { id },
-      relations: ['school', 'category', 'categoryHead'],
+      relations: ['school', 'category', 'categoryHead', 'class'],
     });
 
     if (!feeStructure) {
@@ -887,6 +891,21 @@ export class SuperAdminService {
           throw new BadRequestException(
             `Category head does not belong to school with ID ${schoolId}`,
           );
+        }
+      }
+    }
+
+    // Verify class if being updated
+    if (updateFeeStructureDto.classId !== undefined) {
+      if (updateFeeStructureDto.classId) {
+        const classEntity = await this.classesRepository.findOne({
+          where: { id: updateFeeStructureDto.classId },
+        });
+        if (!classEntity) {
+          throw new NotFoundException(`Class with ID ${updateFeeStructureDto.classId} not found`);
+        }
+        if (classEntity.schoolId !== schoolId) {
+          throw new BadRequestException(`Class does not belong to school with ID ${schoolId}`);
         }
       }
     }

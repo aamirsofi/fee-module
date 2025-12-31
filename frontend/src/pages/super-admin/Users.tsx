@@ -11,6 +11,12 @@ import {
 } from "react-icons/fi";
 import api from "../../services/api";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 interface User {
   id: number;
@@ -252,16 +258,14 @@ export default function SuperAdminUsers() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="card-modern rounded-xl p-4">
-        <div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
             Users Management
-          </h1>
-          <p className="text-gray-600 text-sm mt-1">
-            Manage all users in the system
-          </p>
-        </div>
-      </div>
+          </CardTitle>
+          <CardDescription>Manage all users in the system</CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Success Message - At the top */}
       {success && (
