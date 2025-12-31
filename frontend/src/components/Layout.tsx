@@ -113,6 +113,13 @@ export default function Layout({ children }: LayoutProps) {
       ],
     },
     {
+      name: "Students",
+      path: "/students",
+      icon: FiUsers,
+      section: null,
+      children: null,
+    },
+    {
       name: "Users",
       icon: FiUser,
       section: "users",
@@ -120,6 +127,7 @@ export default function Layout({ children }: LayoutProps) {
         { name: "All Users", path: "/super-admin/users", icon: FiUser },
       ],
     },
+
     {
       name: "Analytics",
       icon: FiBarChart2,
