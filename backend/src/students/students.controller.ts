@@ -8,9 +8,10 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -29,19 +30,34 @@ export class StudentsController {
   @Post()
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new student' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'School ID (required for super admin, optional for others)',
+  })
   @ApiResponse({ status: 201, description: 'Student created successfully' })
-  create(@Body() createStudentDto: CreateStudentDto, @Request() req: any) {
-    const schoolId = req.school?.id || req.user?.schoolId;
+  create(
+    @Body() createStudentDto: CreateStudentDto,
+    @Request() req: any,
+    @Query('schoolId') schoolIdParam?: string,
+  ) {
+    // Get schoolId from query params (for super admin) or from request context
+    const userSchoolId = req.school?.id || req.user?.schoolId;
+    const schoolIdFromQuery = schoolIdParam ? parseInt(schoolIdParam, 10) : undefined;
+    const schoolId = schoolIdFromQuery || userSchoolId;
 
     // Log for debugging
     console.log('Creating student with schoolId:', schoolId);
+    console.log('schoolIdFromQuery:', schoolIdFromQuery);
+    console.log('userSchoolId:', userSchoolId);
     console.log('req.school:', req.school);
     console.log('req.user:', req.user);
 
     // All users including super admin need a school context to create students
     if (!schoolId) {
       throw new BadRequestException(
-        'School context required. Please create a school first or access via school subdomain.',
+        'School context required. Please provide schoolId as query parameter for super admin, or ensure you are logged in with a school assigned.',
       );
     }
 
@@ -57,17 +73,53 @@ export class StudentsController {
   @Get()
   @Roles(UserRole.ADMINISTRATOR, UserRole.ACCOUNTANT, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all students' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'Filter by school ID (optional for super admin)',
+  })
   @ApiResponse({ status: 200, description: 'List of students' })
-  findAll(@Request() req: any) {
-    const schoolId = req.school?.id || req.user.schoolId;
-    // Super admin can access all students, others need school context
-    if (req.user.role === UserRole.SUPER_ADMIN) {
-      return this.studentsService.findAll(schoolId); // schoolId can be undefined for super admin
-    }
-    if (!schoolId) {
+  findAll(@Request() req: any, @Query('schoolId') schoolId?: string) {
+    const userSchoolId = req.school?.id || req.user?.schoolId;
+    const targetSchoolId = schoolId ? +schoolId : userSchoolId;
+
+    if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('School context required');
     }
-    return this.studentsService.findAll(schoolId);
+
+    // For super admin without schoolId, we could return all, but for now require schoolId
+    if (!targetSchoolId) {
+      throw new BadRequestException('School ID is required. Use ?schoolId=X query parameter for super admin.');
+    }
+
+    return this.studentsService.findAll(targetSchoolId);
+  }
+
+  @Get('last-id')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get last student ID for a school' })
+  @ApiQuery({
+    name: 'schoolId',
+    required: false,
+    type: Number,
+    description: 'School ID (optional for super admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Last student ID' })
+  async getLastStudentId(@Request() req: any, @Query('schoolId') schoolId?: string) {
+    const userSchoolId = req.school?.id || req.user?.schoolId;
+    const targetSchoolId = schoolId ? +schoolId : userSchoolId;
+
+    if (!targetSchoolId && req.user.role !== UserRole.SUPER_ADMIN) {
+      throw new BadRequestException('School context required');
+    }
+
+    if (!targetSchoolId) {
+      throw new BadRequestException('School ID is required. Use ?schoolId=X query parameter for super admin.');
+    }
+
+    const lastId = await this.studentsService.getLastStudentId(targetSchoolId);
+    return { lastStudentId: lastId, nextStudentId: lastId ? lastId + 1 : 1 };
   }
 
   @Get(':id')
@@ -97,3 +149,4 @@ export class StudentsController {
     return this.studentsService.remove(+id, schoolId);
   }
 }
+

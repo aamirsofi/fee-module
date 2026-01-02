@@ -2,8 +2,12 @@ import api from './api';
 import { FeeCategory } from '../types';
 
 export const feeCategoriesService = {
-  async getAll(): Promise<FeeCategory[]> {
-    const response = await api.instance.get<FeeCategory[]>('/fee-categories');
+  async getAll(schoolId?: number): Promise<FeeCategory[]> {
+    const params: any = {};
+    if (schoolId) {
+      params.schoolId = schoolId;
+    }
+    const response = await api.instance.get<FeeCategory[]>('/fee-categories', { params });
     return response.data;
   },
 

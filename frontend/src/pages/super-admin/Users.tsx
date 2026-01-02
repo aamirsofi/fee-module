@@ -1,15 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   FiEdit,
   FiTrash2,
   FiLoader,
   FiUser,
-  FiChevronLeft,
-  FiChevronRight,
   FiX,
-  FiSearch,
 } from "react-icons/fi";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown } from "lucide-react";
 import api from "../../services/api";
 import { schoolService, School } from "../../services/schoolService";
 import {
@@ -37,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable } from "@/components/DataTable";
 
 interface User {
   id: number;
@@ -52,15 +52,6 @@ interface User {
   createdAt: string;
 }
 
-interface PaginationMeta {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-}
-
 export default function SuperAdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,14 +65,19 @@ export default function SuperAdminUsers() {
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
-  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(
-    null
-  );
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [paginationMeta, setPaginationMeta] = useState<{
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  } | null>(null);
 
   // Use TanStack Query for schools (using infinite query for pagination)
   const { data: schoolsData, isLoading: loadingSchools } = useInfiniteQuery({
@@ -159,6 +155,16 @@ export default function SuperAdminUsers() {
     }
   };
 
+  const handlePaginationChange = useCallback((pageIndex: number, pageSize: number) => {
+    setPage(pageIndex + 1); // API uses 1-based indexing
+    setLimit(pageSize);
+  }, []);
+
+  const handleSearchChange = useCallback((searchValue: string) => {
+    setSearch(searchValue);
+    setPage(1); // Reset to first page on search
+  }, []);
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -171,17 +177,6 @@ export default function SuperAdminUsers() {
     setError("");
   };
 
-  const handleEdit = (user: User) => {
-    setEditingUser(user);
-    setFormData({
-      name: user.name,
-      email: user.email,
-      password: "", // Don't pre-fill password
-      role: user.role,
-      schoolId: user.schoolId || "",
-    });
-    setError("");
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,10 +212,22 @@ export default function SuperAdminUsers() {
     }
   };
 
-  const handleDelete = (user: User) => {
+  const handleEdit = useCallback((user: User) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      email: user.email,
+      password: "", // Don't pre-fill password
+      role: user.role,
+      schoolId: user.schoolId || "",
+    });
+    setError("");
+  }, []);
+
+  const handleDelete = useCallback((user: User) => {
     setUserToDelete(user);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
   const confirmDelete = async () => {
     if (!userToDelete) return;
@@ -235,6 +242,110 @@ export default function SuperAdminUsers() {
       setError(err.response?.data?.message || "Failed to delete user");
     }
   };
+
+  // Define columns for the data table
+  const columns: ColumnDef<User>[] = useMemo(() => [
+    {
+      accessorKey: "name",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 px-2 lg:px-3"
+          >
+            Name
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => (
+        <div className="font-semibold text-gray-900">{row.getValue("name")}</div>
+      ),
+    },
+    {
+      accessorKey: "email",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 px-2 lg:px-3"
+          >
+            Email
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => (
+        <div className="text-gray-600">{row.getValue("email")}</div>
+      ),
+    },
+    {
+      accessorKey: "role",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 px-2 lg:px-3"
+          >
+            Role
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const role = row.getValue("role") as string;
+        return (
+          <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200">
+            {role.replace("_", " ")}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "school",
+      header: "School",
+      cell: ({ row }) => {
+        const school = row.original.school;
+        return school ? (
+          <span className="font-medium text-gray-900">{school.name}</span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleEdit(user)}
+              className="p-2 text-indigo-600 hover:bg-indigo-100"
+              title="Edit"
+            >
+              <FiEdit className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(user)}
+              className="p-2 text-red-600 hover:bg-red-100"
+              title="Delete"
+            >
+              <FiTrash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ], [handleEdit, handleDelete]);
 
   return (
     <div className="space-y-4">
@@ -423,38 +534,7 @@ export default function SuperAdminUsers() {
         </div>
 
         {/* Right Side - Users List */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Search Bar */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search by name or email..."
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
-                  }}
-                  className="pl-10 pr-10"
-                />
-                {search && (
-                  <button
-                    onClick={() => {
-                      setSearch("");
-                      setPage(1);
-                    }}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <FiX className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Users Table */}
+        <div className="lg:col-span-2">
           <Card>
             <CardContent className="pt-6">
               {loading ? (
@@ -467,190 +547,22 @@ export default function SuperAdminUsers() {
                   <p className="text-gray-500">No users found</p>
                 </div>
               ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            Name
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            Email
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            Role
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            School
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {users.map((user) => (
-                          <tr
-                            key={user.id}
-                            className="hover:bg-indigo-50/50 transition-all duration-150 group"
-                          >
-                            <td className="px-4 py-2 text-sm font-semibold text-gray-900">
-                              {user.name}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-600">
-                              {user.email}
-                            </td>
-                            <td className="px-4 py-2">
-                              <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200">
-                                {user.role.replace("_", " ")}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-600">
-                              {user.school ? (
-                                <span className="font-medium text-gray-900">
-                                  {user.school.name}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2">
-                              <div className="flex items-center gap-1.5">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEdit(user)}
-                                  className="p-2 text-indigo-600 hover:bg-indigo-100"
-                                  title="Edit"
-                                >
-                                  <FiEdit className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(user)}
-                                  className="p-2 text-red-600 hover:bg-red-100"
-                                  title="Delete"
-                                >
-                                  <FiTrash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Pagination */}
-                  {paginationMeta && (
-                    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="text-sm text-gray-600">
-                            Showing {(page - 1) * limit + 1} to{" "}
-                            {Math.min(page * limit, paginationMeta.total)} of{" "}
-                            {paginationMeta.total} users
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-600">
-                              Per page:
-                            </label>
-                            <Select
-                              value={limit.toString()}
-                              onValueChange={(value) => {
-                                setLimit(Number(value));
-                                setPage(1);
-                              }}
-                            >
-                              <SelectTrigger className="w-20">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="5">5</SelectItem>
-                                <SelectItem value="10">10</SelectItem>
-                                <SelectItem value="20">20</SelectItem>
-                                <SelectItem value="50">50</SelectItem>
-                                <SelectItem value="100">100</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPage(page - 1)}
-                            disabled={
-                              !paginationMeta.hasPrevPage ||
-                              paginationMeta.totalPages <= 1
-                            }
-                          >
-                            <FiChevronLeft className="w-4 h-4" />
-                          </Button>
-
-                          {paginationMeta.totalPages > 1 && (
-                            <div className="flex items-center gap-1">
-                              {Array.from(
-                                { length: paginationMeta.totalPages },
-                                (_, i) => i + 1
-                              )
-                                .filter((p) => {
-                                  return (
-                                    p === 1 ||
-                                    p === paginationMeta.totalPages ||
-                                    (p >= page - 1 && p <= page + 1)
-                                  );
-                                })
-                                .map((p, idx, arr) => {
-                                  const prev = arr[idx - 1];
-                                  const showEllipsis = prev && p - prev > 1;
-                                  return (
-                                    <div
-                                      key={p}
-                                      className="flex items-center gap-1"
-                                    >
-                                      {showEllipsis && (
-                                        <span className="px-2 text-gray-400">
-                                          ...
-                                        </span>
-                                      )}
-                                      <Button
-                                        variant={p === page ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setPage(p)}
-                                        className={
-                                          p === page
-                                            ? "bg-indigo-600 text-white border-indigo-600"
-                                            : ""
-                                        }
-                                      >
-                                        {p}
-                                      </Button>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          )}
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPage(page + 1)}
-                            disabled={
-                              !paginationMeta.hasNextPage ||
-                              paginationMeta.totalPages <= 1
-                            }
-                          >
-                            <FiChevronRight className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
+                <DataTable
+                  columns={columns}
+                  data={users}
+                  searchKey="name"
+                  searchPlaceholder="Search users by name or email..."
+                  manualPagination={true}
+                  pageCount={paginationMeta?.totalPages || 0}
+                  totalRows={paginationMeta?.total || 0}
+                  externalPageIndex={page - 1}
+                  externalPageSize={limit}
+                  externalSearchValue={search}
+                  onPaginationChange={handlePaginationChange}
+                  onSearchChange={handleSearchChange}
+                  exportFileName="users"
+                  exportTitle="Users List"
+                />
               )}
             </CardContent>
           </Card>

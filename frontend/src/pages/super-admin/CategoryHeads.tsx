@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown } from "lucide-react";
+import { FiEdit, FiTrash2, FiTag } from "react-icons/fi";
 import api from "../../services/api";
 import {
   Card,
@@ -7,6 +10,8 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   useCategoryHeadsData,
   CategoryHead,
@@ -14,8 +19,8 @@ import {
 import { useCategoryHeadsImport } from "../../hooks/pages/super-admin/useCategoryHeadsImport";
 import CategoryHeadsForm from "./components/CategoryHeadsForm";
 import CategoryHeadsFilters from "./components/CategoryHeadsFilters";
-import CategoryHeadsTable from "./components/CategoryHeadsTable";
 import CategoryHeadsDialogs from "./components/CategoryHeadsDialogs";
+import { DataTable } from "@/components/DataTable";
 
 export default function CategoryHeads() {
   const [mode, setMode] = useState<"add" | "import">("add");
@@ -182,6 +187,146 @@ export default function CategoryHeads() {
     setSuccess("");
   };
 
+  const handlePaginationChange = useCallback(
+    (pageIndex: number, pageSize: number) => {
+      setPage(pageIndex + 1); // API uses 1-based indexing
+      setLimit(pageSize);
+    },
+    []
+  );
+
+  const handleSearchChange = useCallback((searchValue: string) => {
+    setSearch(searchValue);
+    setPage(1); // Reset to first page on search
+  }, []);
+
+  // Define columns for the data table
+  const columns: ColumnDef<CategoryHead>[] = useMemo(
+    () => [
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
+              className="h-8 px-2 lg:px-3"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const categoryHead = row.original;
+          return (
+            <div>
+              <div className="font-semibold text-gray-900">
+                {categoryHead.name}
+              </div>
+              {categoryHead.description && (
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {categoryHead.description}
+                </div>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "school",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
+              className="h-8 px-2 lg:px-3"
+            >
+              School
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const categoryHead = row.original;
+          return (
+            <div className="text-sm text-gray-600">
+              {categoryHead.school?.name ||
+                `School ID: ${categoryHead.schoolId}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
+              className="h-8 px-2 lg:px-3"
+            >
+              Status
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const status = row.getValue("status") as string;
+          return (
+            <span
+              className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                status === "active"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </span>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => {
+          const categoryHead = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEdit(categoryHead)}
+                className="p-1.5 text-indigo-600 hover:bg-indigo-100"
+                title="Edit"
+              >
+                <FiEdit className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  handleDeleteClick(categoryHead.id, categoryHead.schoolId)
+                }
+                className="p-1.5 text-red-600 hover:bg-red-100"
+                title="Delete"
+              >
+                <FiTrash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          );
+        },
+      },
+    ],
+    [handleEdit, handleDeleteClick]
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -241,30 +386,46 @@ export default function CategoryHeads() {
         {/* Right Side - List */}
         <Card className="lg:col-span-2">
           <CardContent className="pt-6">
-            {/* Search and Filter */}
+            {/* Filter */}
             <CategoryHeadsFilters
-            search={search}
-            setSearch={setSearch}
-            selectedSchoolId={selectedSchoolId}
-            setSelectedSchoolId={setSelectedSchoolId}
-            schools={schools}
-            setPage={setPage}
-          />
+              selectedSchoolId={selectedSchoolId}
+              setSelectedSchoolId={setSelectedSchoolId}
+              schools={schools}
+              setPage={setPage}
+            />
 
-          {/* Table */}
-          <CategoryHeadsTable
-            categoryHeads={categoryHeads}
-            loading={loadingCategoryHeads}
-            paginationMeta={paginationMeta}
-            page={page}
-            limit={limit}
-            setPage={setPage}
-            setLimit={setLimit}
-            search={search}
-            selectedSchoolId={selectedSchoolId}
-            handleEdit={handleEdit}
-            handleDeleteClick={handleDeleteClick}
-          />
+            {/* Table */}
+            {loadingCategoryHeads ? (
+              <div className="flex items-center justify-center py-12">
+                <FiTag className="w-8 h-8 animate-spin text-indigo-600" />
+              </div>
+            ) : categoryHeads.length === 0 ? (
+              <div className="text-center py-12">
+                <FiTag className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-500">
+                  {search || selectedSchoolId
+                    ? "No category heads found matching your criteria"
+                    : "No category heads found. Create one to get started."}
+                </p>
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={categoryHeads}
+                searchKey="name"
+                searchPlaceholder="Search category heads..."
+                manualPagination={true}
+                pageCount={paginationMeta?.totalPages || 0}
+                totalRows={paginationMeta?.total || 0}
+                externalPageIndex={page - 1}
+                externalPageSize={limit}
+                externalSearchValue={search}
+                onPaginationChange={handlePaginationChange}
+                onSearchChange={handleSearchChange}
+                exportFileName="category-heads"
+                exportTitle="Category Heads List"
+              />
+            )}
           </CardContent>
         </Card>
       </div>

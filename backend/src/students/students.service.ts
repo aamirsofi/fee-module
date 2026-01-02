@@ -187,4 +187,41 @@ export class StudentsService {
     const student = await this.findOne(id, schoolId);
     await this.studentsRepository.remove(student);
   }
+
+  async getLastStudentId(schoolId: number): Promise<number | null> {
+    const where: any = { schoolId };
+    
+    // Get all students for this school, ordered by id descending (most recent first)
+    // Then we'll extract the numeric part from studentId
+    const students = await this.studentsRepository.find({
+      where,
+      select: ['studentId'],
+      order: { id: 'DESC' },
+      take: 100, // Get more to find the highest numeric ID
+    });
+
+    if (students.length === 0) {
+      return null;
+    }
+
+    // Extract numeric parts from all studentIds and find the maximum
+    let maxNumericId = 0;
+    for (const student of students) {
+      // Extract numeric part from studentId (assuming format like "31970" or "STU31970")
+      const numericMatch = student.studentId.match(/\d+/);
+      if (numericMatch) {
+        const numericId = parseInt(numericMatch[0], 10);
+        if (numericId > maxNumericId) {
+          maxNumericId = numericId;
+        }
+      }
+    }
+
+    return maxNumericId > 0 ? maxNumericId : null;
+  }
+
+  async getNextStudentId(schoolId: number): Promise<number> {
+    const lastId = await this.getLastStudentId(schoolId);
+    return lastId ? lastId + 1 : 1;
+  }
 }

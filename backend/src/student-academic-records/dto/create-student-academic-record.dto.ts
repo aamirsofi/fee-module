@@ -15,6 +15,10 @@ export class CreateStudentAcademicRecordDto {
   @IsNumber()
   classId!: number;
 
+  @ApiProperty()
+  @IsNumber()
+  schoolId!: number;
+
   @ApiProperty({ required: false, example: 'A' })
   @IsString()
   @IsOptional()

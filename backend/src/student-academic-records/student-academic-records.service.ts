@@ -13,6 +13,42 @@ export class StudentAcademicRecordsService {
   ) {}
 
   async create(createDto: CreateStudentAcademicRecordDto): Promise<StudentAcademicRecord> {
+    // If schoolId is not provided, fetch it from student, class, or academicYear
+    let schoolId = createDto.schoolId;
+    
+    if (!schoolId) {
+      // Try to get schoolId from student
+      const { Student } = await import('../students/entities/student.entity');
+      const studentRepo = this.studentAcademicRecordsRepository.manager.getRepository(Student);
+      const student = await studentRepo.findOne({ where: { id: createDto.studentId } });
+      
+      if (student) {
+        schoolId = student.schoolId;
+      } else {
+        // Try to get from class
+        const { Class } = await import('../classes/entities/class.entity');
+        const classRepo = this.studentAcademicRecordsRepository.manager.getRepository(Class);
+        const classEntity = await classRepo.findOne({ where: { id: createDto.classId } });
+        
+        if (classEntity) {
+          schoolId = classEntity.schoolId;
+        } else {
+          // Try to get from academicYear
+          const { AcademicYear } = await import('../academic-years/entities/academic-year.entity');
+          const academicYearRepo = this.studentAcademicRecordsRepository.manager.getRepository(AcademicYear);
+          const academicYear = await academicYearRepo.findOne({ where: { id: createDto.academicYearId } });
+          
+          if (academicYear) {
+            schoolId = academicYear.schoolId;
+          }
+        }
+      }
+    }
+
+    if (!schoolId) {
+      throw new BadRequestException('School ID is required. Could not determine school from student, class, or academic year.');
+    }
+
     // Check if record already exists for this student and academic year
     const existing = await this.studentAcademicRecordsRepository.findOne({
       where: {
@@ -27,7 +63,10 @@ export class StudentAcademicRecordsService {
       );
     }
 
-    const record = this.studentAcademicRecordsRepository.create(createDto);
+    const record = this.studentAcademicRecordsRepository.create({
+      ...createDto,
+      schoolId,
+    });
     return await this.studentAcademicRecordsRepository.save(record);
   }
 
@@ -107,6 +146,7 @@ export class StudentAcademicRecordsService {
         studentId,
         academicYearId: currentAcademicYearId,
       },
+      relations: ['student'],
     });
 
     if (currentRecord) {
@@ -114,11 +154,30 @@ export class StudentAcademicRecordsService {
       await this.studentAcademicRecordsRepository.save(currentRecord);
     }
 
+    // Get schoolId from current record or fetch from student
+    let schoolId: number | undefined;
+    if (currentRecord?.student) {
+      schoolId = currentRecord.student.schoolId;
+    } else {
+      // If still no schoolId, fetch from student
+      const { Student } = await import('../students/entities/student.entity');
+      const studentRepo = this.studentAcademicRecordsRepository.manager.getRepository(Student);
+      const student = await studentRepo.findOne({ where: { id: studentId } });
+      if (student) {
+        schoolId = student.schoolId;
+      }
+    }
+
+    if (!schoolId) {
+      throw new BadRequestException('Could not determine school ID for promotion');
+    }
+
     // Create new record for next academic year
     return await this.create({
       studentId,
       academicYearId: nextAcademicYearId,
       classId: nextClassId,
+      schoolId,
       section,
       status: AcademicRecordStatus.ACTIVE,
     });

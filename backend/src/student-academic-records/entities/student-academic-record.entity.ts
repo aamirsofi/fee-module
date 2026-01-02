@@ -12,6 +12,7 @@ import {
 import { Student } from '../../students/entities/student.entity';
 import { AcademicYear } from '../../academic-years/entities/academic-year.entity';
 import { Class } from '../../classes/entities/class.entity';
+import { School } from '../../schools/entities/school.entity';
 import { StudentFeeStructure } from '../../student-fee-structures/entities/student-fee-structure.entity';
 
 export enum AcademicRecordStatus {
@@ -36,6 +37,9 @@ export class StudentAcademicRecord {
 
   @Column()
   classId!: number; // Linked to Classes entity
+
+  @Column()
+  schoolId!: number; // Direct reference to school for performance and data integrity
 
   @Column({ nullable: true, length: 50 })
   section?: string; // e.g., "A", "B"
@@ -67,6 +71,10 @@ export class StudentAcademicRecord {
   @ManyToOne(() => Class)
   @JoinColumn({ name: 'classId' })
   class!: Class;
+
+  @ManyToOne(() => School)
+  @JoinColumn({ name: 'schoolId' })
+  school!: School;
 
   @OneToMany(() => StudentFeeStructure, sfs => sfs.academicRecord)
   feeStructures!: StudentFeeStructure[];
