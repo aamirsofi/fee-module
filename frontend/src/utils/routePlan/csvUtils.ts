@@ -1,8 +1,9 @@
 /**
- * CSV Utility Functions for Fee Plan Import/Export
+ * CSV Utility Functions for Route Plan Import/Export
  */
 
-export interface ParsedFeePlanRow {
+export interface ParsedRoutePlanRow {
+  routeName?: string;
   feeCategoryName?: string;
   categoryHeadName?: string;
   className?: string;
@@ -12,20 +13,23 @@ export interface ParsedFeePlanRow {
 }
 
 export interface CSVParseOptions {
+  routeMap: Map<string, number>;
   feeCategoryMap: Map<string, number>;
   categoryHeadMap: Map<string, number>;
   classMap: Map<string, number>;
   schoolId: string | number;
 }
 
-export interface ParsedFeePlan {
+export interface ParsedRoutePlan {
   schoolId: string | number;
+  routeId: number;
   feeCategoryId: number;
   categoryHeadId: number | null;
-  classId: number;
+  classId: number | null; // Optional for route plans
   amount: number;
   status: "active" | "inactive";
   name: string;
+  routeName?: string;
   feeCategoryName?: string;
   categoryHeadName?: string;
   className?: string;
@@ -37,8 +41,8 @@ export interface ParsedFeePlan {
 export function parseCSVContent(
   csvText: string,
   options: CSVParseOptions
-): { data: ParsedFeePlan[]; errors: string[] } {
-  const { feeCategoryMap, categoryHeadMap, classMap, schoolId } = options;
+): { data: ParsedRoutePlan[]; errors: string[] } {
+  const { routeMap, feeCategoryMap, categoryHeadMap, classMap, schoolId } = options;
   const lines = csvText.split("\n").filter((line) => line.trim());
 
   if (lines.length < 2) {
@@ -50,7 +54,7 @@ export function parseCSVContent(
   const headers = lines[0]
     .split(",")
     .map((h) => h.trim().replace(/"/g, "").toLowerCase());
-  const data: ParsedFeePlan[] = [];
+  const data: ParsedRoutePlan[] = [];
   const errors: string[] = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -65,7 +69,29 @@ export function parseCSVContent(
 
     const rowNumber = i + 1;
 
-    // Resolve fee category name to ID
+    // Resolve route name to ID
+    const routeName = row.routename || row.routeid || "";
+    let routeId: number | null = null;
+
+    if (routeName) {
+      const idMatch = parseInt(routeName);
+      if (!isNaN(idMatch)) {
+        routeId = idMatch;
+      } else {
+        routeId = routeMap.get(routeName.toLowerCase().trim()) || null;
+        if (!routeId) {
+          errors.push(
+            `Row ${rowNumber}: Route "${routeName}" not found for this school`
+          );
+          continue;
+        }
+      }
+    } else {
+      errors.push(`Row ${rowNumber}: Route is required`);
+      continue;
+    }
+
+    // Resolve fee category name to ID (transport fee category)
     const feeCategoryName =
       row.feecategoryname || row.feecategoryid || "";
     let feeCategoryId: number | null = null;
@@ -79,13 +105,13 @@ export function parseCSVContent(
           feeCategoryMap.get(feeCategoryName.toLowerCase().trim()) || null;
         if (!feeCategoryId) {
           errors.push(
-            `Row ${rowNumber}: Fee category "${feeCategoryName}" not found for this school`
+            `Row ${rowNumber}: Transport fee category "${feeCategoryName}" not found for this school`
           );
           continue;
         }
       }
     } else {
-      errors.push(`Row ${rowNumber}: Fee category is required`);
+      errors.push(`Row ${rowNumber}: Transport fee category is required`);
       continue;
     }
 
@@ -114,11 +140,11 @@ export function parseCSVContent(
       }
     }
 
-    // Resolve class name to ID
+    // Resolve class name to ID (optional)
     const className = row.classname || row.classid || "";
     let classId: number | null = null;
 
-    if (className) {
+    if (className && className.trim() !== "" && className.toLowerCase() !== "none" && className.toLowerCase() !== "all") {
       const idMatch = parseInt(className);
       if (!isNaN(idMatch)) {
         classId = idMatch;
@@ -131,9 +157,6 @@ export function parseCSVContent(
           continue;
         }
       }
-    } else {
-      errors.push(`Row ${rowNumber}: Class is required`);
-      continue;
     }
 
     const amount = parseFloat(row.amount || "0");
@@ -147,6 +170,7 @@ export function parseCSVContent(
 
     data.push({
       schoolId,
+      routeId,
       feeCategoryId,
       categoryHeadId,
       classId,
@@ -154,6 +178,7 @@ export function parseCSVContent(
       status:
         status === "active" || status === "inactive" ? status : "active",
       name,
+      routeName,
       feeCategoryName,
       categoryHeadName: categoryHeadName || "General",
       className,
@@ -169,7 +194,7 @@ export function parseCSVContent(
 export function readAndParseCSV(
   file: File,
   options: CSVParseOptions
-): Promise<ParsedFeePlan[]> {
+): Promise<ParsedRoutePlan[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -205,6 +230,7 @@ export function readAndParseCSV(
  */
 export function generateSampleCSV(): string {
   const headers = [
+    "routeName",
     "feeCategoryName",
     "categoryHeadName",
     "className",
@@ -213,12 +239,13 @@ export function generateSampleCSV(): string {
     "name",
   ];
   const sampleRow = [
-    "Tuition Fee",
+    "Route A",
+    "Transport Fee",
     "",
     "1st",
-    "5000.00",
+    "2000.00",
     "active",
-    "Tuition Fee - General (1st)",
+    "Route A - Transport Fee - General (1st)",
   ];
 
   return [
@@ -247,15 +274,42 @@ export function downloadCSV(
 }
 
 /**
- * Convert data to CSV format
+ * Create lookup maps for name resolution
  */
-export function convertToCSV(
-  headers: string[],
-  rows: string[][]
-): string {
-  return [
-    headers.map((h) => `"${h}"`).join(","),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-  ].join("\n");
+export function createLookupMaps(
+  routes: Array<{ id: number; name: string }>,
+  feeCategories: Array<{ id: number; name: string; type?: string }>,
+  categoryHeads: Array<{ id: number; name: string }>,
+  classes: Array<{ id: number; name: string }>
+): {
+  routeMap: Map<string, number>;
+  feeCategoryMap: Map<string, number>;
+  categoryHeadMap: Map<string, number>;
+  classMap: Map<string, number>;
+} {
+  const routeMap = new Map<string, number>();
+  routes.forEach((route) => {
+    routeMap.set(route.name.toLowerCase().trim(), route.id);
+  });
+
+  // Only include transport fee categories
+  const feeCategoryMap = new Map<string, number>();
+  feeCategories
+    .filter((fc) => fc.type === "transport")
+    .forEach((fc) => {
+      feeCategoryMap.set(fc.name.toLowerCase().trim(), fc.id);
+    });
+
+  const categoryHeadMap = new Map<string, number>();
+  categoryHeads.forEach((ch) => {
+    categoryHeadMap.set(ch.name.toLowerCase().trim(), ch.id);
+  });
+
+  const classMap = new Map<string, number>();
+  classes.forEach((cls) => {
+    classMap.set(cls.name.toLowerCase().trim(), cls.id);
+  });
+
+  return { routeMap, feeCategoryMap, categoryHeadMap, classMap };
 }
 

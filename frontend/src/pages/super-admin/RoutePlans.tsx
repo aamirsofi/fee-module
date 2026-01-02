@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { FiLoader, FiEdit, FiTrash2, FiSearch, FiX } from "react-icons/fi";
+import {
+  FiLoader,
+  FiEdit,
+  FiTrash2,
+  FiSearch,
+  FiX,
+  FiDownload,
+  FiUpload,
+} from "react-icons/fi";
 import {
   Card,
   CardHeader,
@@ -36,11 +44,16 @@ import {
 } from "@/components/ui/dialog";
 import Pagination from "../../components/Pagination";
 import { useRoutePlanData } from "../../hooks/pages/super-admin/useRoutePlanData";
+import { useRoutePlanImport } from "../../hooks/pages/super-admin/useRoutePlanImport";
 import { routePlanService } from "../../services/routePlanService";
+import api from "../../services/api";
 import {
   validateSingleModeRoutePlanForm,
   validateEditRoutePlanForm,
+  validateMultipleModeRoutePlanForm,
   generateRoutePlanNameFromIds,
+  generateRoutePlanCombinations,
+  filterRoutePlanDuplicates,
 } from "../../utils/routePlan";
 import { RoutePlan } from "../../types";
 import { useSchool } from "../../contexts/SchoolContext";
@@ -52,7 +65,8 @@ export default function RoutePlans() {
   );
 
   // Route Plan state (Plan Routes tab)
-  const { selectedSchoolId: routePlanSelectedSchoolId, selectedSchool } = useSchool();
+  const { selectedSchoolId: routePlanSelectedSchoolId, selectedSchool } =
+    useSchool();
   const [routePlanPage, setRoutePlanPage] = useState(1);
   const [routePlanLimit, setRoutePlanLimit] = useState(10);
   const [routePlanSearch, setRoutePlanSearch] = useState("");
@@ -66,9 +80,19 @@ export default function RoutePlans() {
     status: "active" as "active" | "inactive",
     schoolId: "" as string | number,
   });
+  const [createMode, setCreateMode] = useState<"single" | "multiple">("single");
+  const [selectedRouteIds, setSelectedRouteIds] = useState<number[]>([]);
+  const [selectedFeeCategoryIds, setSelectedFeeCategoryIds] = useState<
+    number[]
+  >([]);
+  const [selectedCategoryHeadIds, setSelectedCategoryHeadIds] = useState<
+    number[]
+  >([]);
+  const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
   const [editingRoutePlan, setEditingRoutePlan] = useState<RoutePlan | null>(
     null
   );
+  const [formResetKey, setFormResetKey] = useState(0);
   const [routePlanDeleteDialogOpen, setRoutePlanDeleteDialogOpen] =
     useState(false);
   const [routePlanDeleteItem, setRoutePlanDeleteItem] = useState<{
@@ -102,6 +126,29 @@ export default function RoutePlans() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Use custom hook for import functionality
+  const {
+    importSchoolId: hookImportSchoolId,
+    importFile,
+    setImportFile,
+    importPreview,
+    setImportPreview,
+    isImporting,
+    importResult,
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    downloadSampleCSV,
+    handleBulkImport,
+  } = useRoutePlanImport({
+    refetchRoutePlans,
+    setError,
+    setSuccess,
+  });
+
+  // Sync importSchoolId with context school
+  const importSchoolId = routePlanSelectedSchoolId || hookImportSchoolId;
+
   // Route Plan handlers
   const resetRoutePlanForm = (
     retainSchool: boolean = false,
@@ -116,6 +163,12 @@ export default function RoutePlans() {
       status: "active",
       schoolId: retainSchool && schoolId ? schoolId : "",
     });
+    setCreateMode("single");
+    setSelectedRouteIds([]);
+    setSelectedFeeCategoryIds([]);
+    setSelectedCategoryHeadIds([]);
+    setSelectedClasses([]);
+    setFormResetKey((prev) => prev + 1);
   };
 
   const handleRoutePlanSubmit = async (e: React.FormEvent) => {
@@ -127,6 +180,13 @@ export default function RoutePlans() {
       // Validate form
       const validation = editingRoutePlan
         ? validateEditRoutePlanForm(routePlanFormData)
+        : createMode === "multiple"
+        ? validateMultipleModeRoutePlanForm(
+            routePlanFormData,
+            selectedRouteIds,
+            selectedFeeCategoryIds,
+            selectedClasses
+          )
         : validateSingleModeRoutePlanForm(routePlanFormData);
 
       if (!validation.isValid) {
@@ -179,37 +239,116 @@ export default function RoutePlans() {
         resetRoutePlanForm(true, currentSchoolId);
         setSuccess("Route plan updated successfully!");
       } else {
-        // Create mode - Single create
-        const planName = generateRoutePlanNameFromIds(
-          parseInt(routePlanFormData.routeId as string),
-          parseInt(routePlanFormData.feeCategoryId as string),
-          routePlanFormData.categoryHeadId
-            ? parseInt(routePlanFormData.categoryHeadId as string)
-            : null,
-          routePlanFormData.classId
-            ? parseInt(routePlanFormData.classId as string)
-            : null,
-          routePlanRoutes,
-          transportFeeCategories,
-          routePlanCategoryHeads,
-          routePlanClassOptions
-        );
+        // Create mode
+        if (createMode === "multiple") {
+          // Generate all combinations using utility function
+          const combinations = generateRoutePlanCombinations(
+            selectedRouteIds,
+            selectedFeeCategoryIds,
+            selectedCategoryHeadIds,
+            selectedClasses
+          );
 
-        await routePlanService.createRoutePlan(currentSchoolId, {
-          routeId: parseInt(routePlanFormData.routeId as string),
-          feeCategoryId: parseInt(routePlanFormData.feeCategoryId as string),
-          categoryHeadId: routePlanFormData.categoryHeadId
-            ? parseInt(routePlanFormData.categoryHeadId as string)
-            : undefined,
-          classId: routePlanFormData.classId
-            ? parseInt(routePlanFormData.classId as string)
-            : undefined,
-          name: planName,
-          amount: parseFloat(routePlanFormData.amount),
-          status: routePlanFormData.status,
-        });
-        resetRoutePlanForm(true, currentSchoolId);
-        setSuccess("Route plan created successfully!");
+          // Check for existing route plans to avoid duplicates
+          const existingRoutePlansResponse = await api.instance.get(
+            "/super-admin/route-plans",
+            {
+              params: {
+                schoolId: currentSchoolId,
+                limit: 10000, // Get all to check duplicates
+                page: 1,
+              },
+            }
+          );
+          const existingRoutePlans =
+            existingRoutePlansResponse.data.data ||
+            existingRoutePlansResponse.data ||
+            [];
+
+          // Filter out duplicates
+          const filteredCombinations = filterRoutePlanDuplicates(
+            combinations,
+            existingRoutePlans
+          );
+
+          if (filteredCombinations.length === 0) {
+            setError("All selected combinations already exist");
+            return;
+          }
+
+          // Create all route plans
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const combo of filteredCombinations) {
+            try {
+              const planName = generateRoutePlanNameFromIds(
+                combo.routeId,
+                combo.feeCategoryId,
+                combo.categoryHeadId,
+                combo.classId,
+                routePlanRoutes,
+                transportFeeCategories,
+                routePlanCategoryHeads,
+                routePlanClassOptions
+              );
+
+              await routePlanService.createRoutePlan(currentSchoolId, {
+                routeId: combo.routeId,
+                feeCategoryId: combo.feeCategoryId,
+                categoryHeadId: combo.categoryHeadId || undefined,
+                classId: combo.classId || undefined,
+                name: planName,
+                amount: parseFloat(routePlanFormData.amount),
+                status: routePlanFormData.status,
+              });
+              successCount++;
+            } catch (err: any) {
+              errorCount++;
+            }
+          }
+
+          resetRoutePlanForm(true, currentSchoolId);
+          if (errorCount > 0) {
+            setSuccess(
+              `Successfully created ${successCount} route plan(s). ${errorCount} failed.`
+            );
+          } else {
+            setSuccess(`Successfully created ${successCount} route plan(s)`);
+          }
+        } else {
+          // Single create mode
+          const planName = generateRoutePlanNameFromIds(
+            parseInt(routePlanFormData.routeId as string),
+            parseInt(routePlanFormData.feeCategoryId as string),
+            routePlanFormData.categoryHeadId
+              ? parseInt(routePlanFormData.categoryHeadId as string)
+              : null,
+            routePlanFormData.classId
+              ? parseInt(routePlanFormData.classId as string)
+              : null,
+            routePlanRoutes,
+            transportFeeCategories,
+            routePlanCategoryHeads,
+            routePlanClassOptions
+          );
+
+          await routePlanService.createRoutePlan(currentSchoolId, {
+            routeId: parseInt(routePlanFormData.routeId as string),
+            feeCategoryId: parseInt(routePlanFormData.feeCategoryId as string),
+            categoryHeadId: routePlanFormData.categoryHeadId
+              ? parseInt(routePlanFormData.categoryHeadId as string)
+              : undefined,
+            classId: routePlanFormData.classId
+              ? parseInt(routePlanFormData.classId as string)
+              : undefined,
+            name: planName,
+            amount: parseFloat(routePlanFormData.amount),
+            status: routePlanFormData.status,
+          });
+          resetRoutePlanForm(true, currentSchoolId);
+          setSuccess("Route plan created successfully!");
+        }
       }
 
       refetchRoutePlans();
@@ -273,8 +412,18 @@ export default function RoutePlans() {
 
   // Auto-set schoolId from context when creating new route plan
   useEffect(() => {
-    if (!editingRoutePlan && routePlanSelectedSchoolId && routePlanFormData.schoolId === "") {
-      setRoutePlanFormData({ ...routePlanFormData, schoolId: routePlanSelectedSchoolId });
+    if (!editingRoutePlan && routePlanSelectedSchoolId) {
+      setRoutePlanFormData((prev) => {
+        // Only update if schoolId is empty or different
+        if (
+          !prev.schoolId ||
+          prev.schoolId === "" ||
+          prev.schoolId !== routePlanSelectedSchoolId
+        ) {
+          return { ...prev, schoolId: routePlanSelectedSchoolId };
+        }
+        return prev;
+      });
     }
   }, [routePlanSelectedSchoolId, editingRoutePlan]);
 
@@ -304,7 +453,9 @@ export default function RoutePlans() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link to="/super-admin/settings/fee-settings/route-plan">Settings</Link>
+              <Link to="/super-admin/settings/fee-settings/route-plan">
+                Settings
+              </Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
@@ -382,9 +533,27 @@ export default function RoutePlans() {
                   <CardContent>
                     <Tabs
                       value={routePlanMode}
-                      onValueChange={(v) =>
-                        setRoutePlanMode(v as "add" | "import")
-                      }
+                      onValueChange={(v) => {
+                        if (v === "add") {
+                          setRoutePlanMode("add");
+                          setError("");
+                          setSuccess("");
+                          setImportFile(null);
+                          setImportPreview([]);
+                          // Auto-set schoolId when switching to add mode
+                          if (routePlanSelectedSchoolId) {
+                            setRoutePlanFormData((prev) => ({
+                              ...prev,
+                              schoolId: routePlanSelectedSchoolId,
+                            }));
+                          }
+                        } else if (v === "import") {
+                          setRoutePlanMode("import");
+                          setError("");
+                          setSuccess("");
+                          resetRoutePlanForm();
+                        }
+                      }}
                     >
                       <TabsList className="grid w-full grid-cols-2 mb-4">
                         <TabsTrigger value="add">Add Route Plan</TabsTrigger>
@@ -402,22 +571,48 @@ export default function RoutePlans() {
                             </label>
                             <Input
                               type="text"
-                              value={selectedSchool?.name || "No school selected"}
+                              value={
+                                selectedSchool?.name || "No school selected"
+                              }
                               disabled
                               className="bg-gray-50 cursor-not-allowed text-xs"
                             />
                             {!selectedSchool && (
                               <p className="text-xs text-red-500 mt-1">
-                                Please select a school from the top navigation bar
+                                Please select a school from the top navigation
+                                bar
                               </p>
                             )}
                           </div>
 
                           {/* Route */}
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                              Route <span className="text-red-500">*</span>
-                            </label>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="block text-xs font-medium text-gray-700">
+                                Route <span className="text-red-500">*</span>
+                              </label>
+                              {routePlanFormData.schoolId &&
+                                routePlanRoutes.length > 0 &&
+                                !editingRoutePlan && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      setCreateMode(
+                                        createMode === "single"
+                                          ? "multiple"
+                                          : "single"
+                                      )
+                                    }
+                                    className="h-auto p-0 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                                  >
+                                    {createMode === "single"
+                                      ? "Bulk"
+                                      : "Single"}
+                                  </Button>
+                                )}
+                            </div>
                             {!routePlanFormData.schoolId ? (
                               <div className="px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
                                 Select school first
@@ -426,8 +621,9 @@ export default function RoutePlans() {
                               <div className="flex items-center justify-center py-1">
                                 <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
                               </div>
-                            ) : (
+                            ) : createMode === "single" ? (
                               <Select
+                                key={`route-${formResetKey}`}
                                 value={
                                   routePlanFormData.routeId &&
                                   routePlanFormData.routeId !== ""
@@ -456,6 +652,74 @@ export default function RoutePlans() {
                                   ))}
                                 </SelectContent>
                               </Select>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
+                                  {/* Select All */}
+                                  <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        routePlanRoutes.length > 0 &&
+                                        selectedRouteIds.length ===
+                                          routePlanRoutes.length
+                                      }
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedRouteIds(
+                                            routePlanRoutes.map(
+                                              (route) => route.id
+                                            )
+                                          );
+                                        } else {
+                                          setSelectedRouteIds([]);
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                    />
+                                    <span className="ml-1.5 text-xs font-semibold text-indigo-700">
+                                      All ({routePlanRoutes.length})
+                                    </span>
+                                  </label>
+                                  {routePlanRoutes.map((route) => (
+                                    <label
+                                      key={route.id}
+                                      className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedRouteIds.includes(
+                                          route.id
+                                        )}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedRouteIds([
+                                              ...selectedRouteIds,
+                                              route.id,
+                                            ]);
+                                          } else {
+                                            setSelectedRouteIds(
+                                              selectedRouteIds.filter(
+                                                (id) => id !== route.id
+                                              )
+                                            );
+                                          }
+                                        }}
+                                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                      />
+                                      <span className="ml-1.5 text-xs text-gray-700">
+                                        {route.name}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                                {createMode === "multiple" &&
+                                  selectedRouteIds.length > 0 && (
+                                    <div className="text-xs text-gray-600">
+                                      {selectedRouteIds.length} selected
+                                    </div>
+                                  )}
+                              </div>
                             )}
                           </div>
 
@@ -473,8 +737,9 @@ export default function RoutePlans() {
                               <div className="flex items-center justify-center py-1">
                                 <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
                               </div>
-                            ) : (
+                            ) : createMode === "single" ? (
                               <Select
+                                key={`fee-category-${formResetKey}`}
                                 value={
                                   routePlanFormData.feeCategoryId &&
                                   routePlanFormData.feeCategoryId !== ""
@@ -503,6 +768,74 @@ export default function RoutePlans() {
                                   ))}
                                 </SelectContent>
                               </Select>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
+                                  {/* Select All */}
+                                  <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        transportFeeCategories.length > 0 &&
+                                        selectedFeeCategoryIds.length ===
+                                          transportFeeCategories.length
+                                      }
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedFeeCategoryIds(
+                                            transportFeeCategories.map(
+                                              (cat) => cat.id
+                                            )
+                                          );
+                                        } else {
+                                          setSelectedFeeCategoryIds([]);
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                    />
+                                    <span className="ml-1.5 text-xs font-semibold text-indigo-700">
+                                      All ({transportFeeCategories.length})
+                                    </span>
+                                  </label>
+                                  {transportFeeCategories.map((cat) => (
+                                    <label
+                                      key={cat.id}
+                                      className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedFeeCategoryIds.includes(
+                                          cat.id
+                                        )}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedFeeCategoryIds([
+                                              ...selectedFeeCategoryIds,
+                                              cat.id,
+                                            ]);
+                                          } else {
+                                            setSelectedFeeCategoryIds(
+                                              selectedFeeCategoryIds.filter(
+                                                (id) => id !== cat.id
+                                              )
+                                            );
+                                          }
+                                        }}
+                                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                      />
+                                      <span className="ml-1.5 text-xs text-gray-700">
+                                        {cat.name}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                                {createMode === "multiple" &&
+                                  selectedFeeCategoryIds.length > 0 && (
+                                    <div className="text-xs text-gray-600">
+                                      {selectedFeeCategoryIds.length} selected
+                                    </div>
+                                  )}
+                              </div>
                             )}
                           </div>
 
@@ -522,8 +855,9 @@ export default function RoutePlans() {
                               <div className="flex items-center justify-center py-1">
                                 <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
                               </div>
-                            ) : (
+                            ) : createMode === "single" ? (
                               <Select
+                                key={`category-head-${formResetKey}`}
                                 value={
                                   routePlanFormData.categoryHeadId
                                     ? routePlanFormData.categoryHeadId.toString()
@@ -557,6 +891,76 @@ export default function RoutePlans() {
                                   ))}
                                 </SelectContent>
                               </Select>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
+                                  {/* Select All */}
+                                  {routePlanCategoryHeads.length > 0 && (
+                                    <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
+                                      <input
+                                        type="checkbox"
+                                        checked={
+                                          routePlanCategoryHeads.length > 0 &&
+                                          selectedCategoryHeadIds.length ===
+                                            routePlanCategoryHeads.length
+                                        }
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedCategoryHeadIds(
+                                              routePlanCategoryHeads.map(
+                                                (ch) => ch.id
+                                              )
+                                            );
+                                          } else {
+                                            setSelectedCategoryHeadIds([]);
+                                          }
+                                        }}
+                                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                      />
+                                      <span className="ml-1.5 text-xs font-semibold text-indigo-700">
+                                        All ({routePlanCategoryHeads.length})
+                                      </span>
+                                    </label>
+                                  )}
+                                  {routePlanCategoryHeads.map((ch) => (
+                                    <label
+                                      key={ch.id}
+                                      className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedCategoryHeadIds.includes(
+                                          ch.id
+                                        )}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedCategoryHeadIds([
+                                              ...selectedCategoryHeadIds,
+                                              ch.id,
+                                            ]);
+                                          } else {
+                                            setSelectedCategoryHeadIds(
+                                              selectedCategoryHeadIds.filter(
+                                                (id) => id !== ch.id
+                                              )
+                                            );
+                                          }
+                                        }}
+                                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                      />
+                                      <span className="ml-1.5 text-xs text-gray-700">
+                                        {ch.name}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                                {createMode === "multiple" &&
+                                  selectedCategoryHeadIds.length > 0 && (
+                                    <div className="text-xs text-gray-600">
+                                      {selectedCategoryHeadIds.length} selected
+                                    </div>
+                                  )}
+                              </div>
                             )}
                           </div>
 
@@ -573,8 +977,9 @@ export default function RoutePlans() {
                               <div className="flex items-center justify-center py-1">
                                 <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
                               </div>
-                            ) : (
+                            ) : createMode === "single" ? (
                               <Select
+                                key={`class-${formResetKey}`}
                                 value={
                                   routePlanFormData.classId &&
                                   routePlanFormData.classId !== ""
@@ -602,6 +1007,74 @@ export default function RoutePlans() {
                                   ))}
                                 </SelectContent>
                               </Select>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-1.5 bg-white">
+                                  {/* Select All */}
+                                  <label className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-200 mb-0.5 pb-0.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        routePlanClassOptions.length > 0 &&
+                                        selectedClasses.length ===
+                                          routePlanClassOptions.length
+                                      }
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedClasses(
+                                            routePlanClassOptions.map(
+                                              (cls) => cls.id
+                                            )
+                                          );
+                                        } else {
+                                          setSelectedClasses([]);
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                    />
+                                    <span className="ml-1.5 text-xs font-semibold text-indigo-700">
+                                      All ({routePlanClassOptions.length})
+                                    </span>
+                                  </label>
+                                  {routePlanClassOptions.map((cls) => (
+                                    <label
+                                      key={cls.id}
+                                      className="flex items-center px-1.5 py-1 hover:bg-gray-50 rounded cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedClasses.includes(
+                                          cls.id
+                                        )}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedClasses([
+                                              ...selectedClasses,
+                                              cls.id,
+                                            ]);
+                                          } else {
+                                            setSelectedClasses(
+                                              selectedClasses.filter(
+                                                (id) => id !== cls.id
+                                              )
+                                            );
+                                          }
+                                        }}
+                                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                      />
+                                      <span className="ml-1.5 text-xs text-gray-700">
+                                        {cls.name}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                                {createMode === "multiple" &&
+                                  selectedClasses.length > 0 && (
+                                    <div className="text-xs text-gray-600">
+                                      {selectedClasses.length} selected
+                                    </div>
+                                  )}
+                              </div>
                             )}
                           </div>
 
@@ -679,8 +1152,278 @@ export default function RoutePlans() {
                         </form>
                       </TabsContent>
                       <TabsContent value="import">
-                        <div className="text-center py-8 text-gray-500 text-sm">
-                          Import functionality coming soon...
+                        <div className="space-y-4">
+                          {/* School Selection for Import */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                              School <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                              type="text"
+                              value={
+                                selectedSchool?.name || "No school selected"
+                              }
+                              disabled
+                              className="bg-gray-50 cursor-not-allowed text-xs"
+                            />
+                            {!selectedSchool && (
+                              <p className="text-xs text-red-500 mt-1">
+                                Please select a school from the top navigation
+                                bar
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Download Sample CSV */}
+                          {importSchoolId && (
+                            <div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={downloadSampleCSV}
+                                className="w-full"
+                              >
+                                <FiDownload className="w-4 h-4 mr-2" />
+                                Download Sample CSV
+                              </Button>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Download a sample CSV template. Use names (not
+                                IDs) for routes, transport fee categories,
+                                category heads, and classes.
+                              </p>
+                              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-xs font-semibold text-blue-900 mb-1">
+                                  CSV Format:
+                                </p>
+                                <ul className="text-xs text-blue-800 space-y-0.5 list-disc list-inside">
+                                  <li>
+                                    <strong>routeName</strong> - Name of route
+                                    (e.g., "Route A")
+                                  </li>
+                                  <li>
+                                    <strong>feeCategoryName</strong> - Name of
+                                    transport fee category (e.g., "Transport
+                                    Fee")
+                                  </li>
+                                  <li>
+                                    <strong>categoryHeadName</strong> - Name of
+                                    category head (optional, leave empty for
+                                    "General")
+                                  </li>
+                                  <li>
+                                    <strong>className</strong> - Name of class
+                                    (optional, e.g., "1st", "2nd")
+                                  </li>
+                                  <li>
+                                    <strong>amount</strong> - Fee amount (e.g.,
+                                    "2000.00")
+                                  </li>
+                                  <li>
+                                    <strong>status</strong> - "active" or
+                                    "inactive"
+                                  </li>
+                                  <li>
+                                    <strong>name</strong> - Plan name (optional,
+                                    auto-generated if empty)
+                                  </li>
+                                </ul>
+                                <p className="text-xs text-blue-700 mt-1 font-medium">
+                                  Note: All names must belong to the selected
+                                  school. The system will validate and show
+                                  errors if names don't match.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* File Upload */}
+                          {importSchoolId && (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                Upload CSV File{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <div
+                                {...getRootProps()}
+                                className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-smooth ${
+                                  isDragActive
+                                    ? "border-indigo-500 bg-indigo-50"
+                                    : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
+                                }`}
+                              >
+                                <input {...getInputProps()} />
+                                <FiUpload className="w-6 h-6 mx-auto text-gray-400 mb-2" />
+                                {importFile ? (
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-700">
+                                      {importFile.name}
+                                    </p>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setImportFile(null);
+                                        setImportPreview([]);
+                                        setError("");
+                                        setSuccess("");
+                                      }}
+                                      className="mt-1 text-xs"
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <p className="text-xs text-gray-600">
+                                      {isDragActive
+                                        ? "Drop your CSV file here"
+                                        : "Drag & drop your CSV file here"}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      or click to browse
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Preview */}
+                          {importPreview.length > 0 && (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                Preview ({importPreview.length} rows)
+                              </label>
+                              <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                                <table className="w-full text-xs">
+                                  <thead className="bg-gray-50 sticky top-0">
+                                    <tr>
+                                      <th className="px-2 py-1 text-left">
+                                        Route
+                                      </th>
+                                      <th className="px-2 py-1 text-left">
+                                        Fee Category
+                                      </th>
+                                      <th className="px-2 py-1 text-left">
+                                        Category Head
+                                      </th>
+                                      <th className="px-2 py-1 text-left">
+                                        Class
+                                      </th>
+                                      <th className="px-2 py-1 text-left">
+                                        Amount
+                                      </th>
+                                      <th className="px-2 py-1 text-left">
+                                        Status
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {importPreview.map((row, idx) => (
+                                      <tr key={idx} className="border-t">
+                                        <td className="px-2 py-1">
+                                          {row.routeName ||
+                                            `ID: ${row.routeId}`}
+                                        </td>
+                                        <td className="px-2 py-1">
+                                          {row.feeCategoryName ||
+                                            `ID: ${row.feeCategoryId}`}
+                                        </td>
+                                        <td className="px-2 py-1">
+                                          {row.categoryHeadName || "General"}
+                                        </td>
+                                        <td className="px-2 py-1">
+                                          {row.className || row.classId
+                                            ? `ID: ${row.classId}`
+                                            : "-"}
+                                        </td>
+                                        <td className="px-2 py-1">
+                                          {row.amount}
+                                        </td>
+                                        <td className="px-2 py-1">
+                                          {row.status}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Import Button */}
+                          {importFile && importSchoolId && (
+                            <Button
+                              type="button"
+                              onClick={handleBulkImport}
+                              disabled={isImporting}
+                              className="w-full"
+                            >
+                              {isImporting ? (
+                                <span className="flex items-center justify-center gap-2">
+                                  <FiLoader className="w-4 h-4 animate-spin" />
+                                  Importing...
+                                </span>
+                              ) : (
+                                "Import Route Plans"
+                              )}
+                            </Button>
+                          )}
+
+                          {/* Import Results */}
+                          {importResult && (
+                            <div className="space-y-2">
+                              {importResult.success > 0 && (
+                                <Card className="border-l-4 border-l-green-400 bg-green-50">
+                                  <CardContent className="py-2 px-3">
+                                    <p className="text-xs font-semibold text-green-800">
+                                      Successfully imported:{" "}
+                                      {importResult.success} route plan(s)
+                                    </p>
+                                  </CardContent>
+                                </Card>
+                              )}
+                              {importResult.skipped > 0 && (
+                                <Card className="border-l-4 border-l-yellow-400 bg-yellow-50">
+                                  <CardContent className="py-2 px-3">
+                                    <p className="text-xs font-semibold text-yellow-800 mb-1">
+                                      Skipped (duplicates):{" "}
+                                      {importResult.skipped} route plan(s)
+                                    </p>
+                                    <div className="max-h-24 overflow-y-auto text-xs text-yellow-700">
+                                      {importResult.duplicates.map(
+                                        (dup, idx) => (
+                                          <div key={idx} className="mb-0.5">
+                                            Row {dup.row} - "{dup.name}":{" "}
+                                            {dup.reason}
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              )}
+                              {importResult.failed > 0 && (
+                                <Card className="border-l-4 border-l-red-400 bg-red-50">
+                                  <CardContent className="py-2 px-3">
+                                    <p className="text-xs font-semibold text-red-800 mb-1">
+                                      Failed: {importResult.failed} route
+                                      plan(s)
+                                    </p>
+                                    <div className="max-h-24 overflow-y-auto text-xs text-red-700">
+                                      {importResult.errors.map((err, idx) => (
+                                        <div key={idx} className="mb-0.5">
+                                          Row {err.row}: {err.error}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </TabsContent>
                     </Tabs>

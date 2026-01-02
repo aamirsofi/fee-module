@@ -32,10 +32,10 @@ export function validateSchool(
 }
 
 /**
- * Validate amount
+ * Validate amount (0 is valid for some routes/fee plans)
  */
 export function validateAmount(amount: string): ValidationResult {
-  if (!amount || parseFloat(amount) <= 0) {
+  if (!amount || amount === "" || isNaN(parseFloat(amount)) || parseFloat(amount) < 0) {
     return { isValid: false, error: "Please enter a valid amount" };
   }
   return { isValid: true };
