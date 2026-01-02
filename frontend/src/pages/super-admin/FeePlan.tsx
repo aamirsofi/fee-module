@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { FiLoader, FiDownload, FiUpload } from "react-icons/fi";
+import { FiLoader, FiDownload, FiUpload, FiEdit, FiTrash2, FiDollarSign } from "react-icons/fi";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown } from "lucide-react";
 // useDropzone is now in useFeePlanImport hook
 import api from "../../services/api";
 import { FeeStructure } from "../../types";
@@ -25,10 +27,9 @@ import { useFeePlanImport } from "../../hooks/pages/super-admin/useFeePlanImport
 import { useFeePlanSelection } from "../../hooks/pages/super-admin/useFeePlanSelection";
 import { useSchool } from "../../contexts/SchoolContext";
 // import { useFeePlanForm } from "../../hooks/pages/super-admin/useFeePlanForm"; // TODO: Fix circular dependency
-import { FeePlanFilters } from "./components/FeePlanFilters";
 import { FeePlanDialogs } from "./components/FeePlanDialogs";
-import { FeePlanTable } from "./components/FeePlanTable";
 import { FeePlanForm } from "./components/FeePlanForm";
+import { DataTable } from "@/components/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -492,6 +493,177 @@ export default function FeePlan() {
     setBulkDeleteDialogOpen(true);
   };
 
+  const handlePaginationChange = useCallback((pageIndex: number, pageSize: number) => {
+    setPage(pageIndex + 1);
+    setLimit(pageSize);
+  }, []);
+
+  const handleSearchChange = useCallback((searchValue: string) => {
+    setSearch(searchValue);
+    setPage(1);
+  }, []);
+
+  const columns: ColumnDef<FeeStructure>[] = useMemo(
+    () => [
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Plan Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return <div className="font-semibold">{row.getValue("name")}</div>;
+        },
+      },
+      {
+        accessorKey: "school",
+        header: "School",
+        cell: ({ row }) => {
+          const school = row.original.school;
+          return (
+            <div className="text-sm text-gray-600">
+              {school?.name || `School ID: ${row.original.schoolId}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "class",
+        header: "Class",
+        cell: ({ row }) => {
+          const classItem = row.original.class;
+          const classId = row.original.classId;
+          const className = classItem?.name || (classId ? classOptions.find((c) => c.id === classId)?.name : null) || "-";
+          return <div className="text-sm text-gray-600">{className}</div>;
+        },
+      },
+      {
+        accessorKey: "categoryHead",
+        header: "Category Head",
+        cell: ({ row }) => {
+          const categoryHead = row.original.categoryHead;
+          return (
+            <div className="text-sm text-gray-600">
+              {categoryHead?.name || "General"}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "category",
+        header: "Fee Heading",
+        cell: ({ row }) => {
+          const category = row.original.category;
+          return (
+            <div className="text-sm text-gray-600">
+              {category?.name || `Category ID: ${row.original.feeCategoryId}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "amount",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Amount
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const amount = parseFloat(row.getValue("amount") as string);
+          return (
+            <div className="flex items-center text-sm font-semibold">
+              <FiDollarSign className="w-4 h-4 mr-1 text-indigo-500" />
+              {amount.toLocaleString()}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Status
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const status = row.getValue("status") as string;
+          return (
+            <span
+              className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                status === "active"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </span>
+          );
+        },
+        filterConfig: {
+          column: "status",
+          title: "Status",
+          options: [
+            { label: "Active", value: "active" },
+            { label: "Inactive", value: "inactive" },
+          ],
+        },
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => {
+          const structure = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEdit(structure)}
+                className="text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50"
+                title="Edit"
+              >
+                <FiEdit className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteClick(structure.id, structure.schoolId)}
+                className="text-red-600 hover:text-red-900 hover:bg-red-50"
+                title="Delete"
+              >
+                <FiTrash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
+    ],
+    [classOptions, handleEdit, handleDeleteClick]
+  );
+
   const handleBulkDeleteWithDialog = async () => {
     await handleBulkDelete();
     setBulkDeleteDialogOpen(false);
@@ -868,35 +1040,79 @@ export default function FeePlan() {
         {/* Right Side - List */}
         <Card className="lg:col-span-2">
           <CardContent className="pt-6">
-            {/* Search and Filter */}
-            <FeePlanFilters
-              search={search}
-              setSearch={setSearch}
-              setPage={setPage}
-            />
+            {/* Bulk Actions Bar */}
+            {selectedFeePlanIds.length > 0 && (
+              <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-indigo-900">
+                    {selectedFeePlanIds.length} fee plan(s) selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleExport}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    size="sm"
+                  >
+                    <FiDownload className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                  <Button
+                    onClick={handleBulkDeleteClick}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    size="sm"
+                  >
+                    <FiTrash2 className="w-4 h-4 mr-2" />
+                    Delete ({selectedFeePlanIds.length})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedFeePlanIds([]);
+                      setIsSelectAll(false);
+                    }}
+                    size="sm"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Table */}
-            <FeePlanTable
-              feeStructures={feeStructures}
-              loading={loading}
-              paginationMeta={paginationMeta}
-              page={page}
-              limit={limit}
-              setPage={setPage}
-              setLimit={setLimit}
-              search={search}
-              selectedSchoolId={selectedSchoolId}
-              selectedFeePlanIds={selectedFeePlanIds}
-              setSelectedFeePlanIds={setSelectedFeePlanIds}
-              setIsSelectAll={setIsSelectAll}
-              isSelectAll={isSelectAll}
-              handleSelectAll={handleSelectAll}
-              handleSelectFeePlan={handleSelectFeePlan}
-              handleEdit={handleEdit}
-              handleDeleteClick={handleDeleteClick}
-              handleExport={handleExport}
-              handleBulkDeleteClick={handleBulkDeleteClick}
-            />
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <FiLoader className="w-8 h-8 animate-spin text-indigo-600" />
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={feeStructures}
+                searchKey="name"
+                searchPlaceholder="Search fee plans..."
+                enableRowSelection={true}
+                onRowSelectionChange={(selectedRows) => {
+                  const selectedIds = selectedRows.map((row) => row.original.id);
+                  setSelectedFeePlanIds(selectedIds);
+                  setIsSelectAll(selectedIds.length === feeStructures.length && feeStructures.length > 0);
+                }}
+                rowSelection={selectedFeePlanIds.reduce((acc, id) => {
+                  acc[id] = true;
+                  return acc;
+                }, {} as Record<number, boolean>)}
+                manualPagination={true}
+                pageCount={paginationMeta?.totalPages || 0}
+                totalRows={paginationMeta?.total || 0}
+                onPaginationChange={handlePaginationChange}
+                onSearchChange={handleSearchChange}
+                externalPageIndex={page - 1}
+                externalPageSize={limit}
+                externalSearchValue={search}
+                exportFileName="fee-plans"
+                exportTitle="Fee Plans List"
+                enableExport={true}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

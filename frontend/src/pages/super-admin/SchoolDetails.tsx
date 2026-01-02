@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   FiLoader,
@@ -14,6 +14,8 @@ import {
   FiEdit,
   FiUpload,
 } from "react-icons/fi";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown } from "lucide-react";
 import api from "../../services/api";
 import StudentBulkImport from "../../components/StudentBulkImport";
 import {
@@ -32,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable } from "@/components/DataTable";
 
 interface SchoolDetails {
   school: {
@@ -174,6 +177,460 @@ export default function SchoolDetails() {
     // Clear error message after 5 seconds
     setTimeout(() => setImportError(""), 5000);
   };
+
+  // Column definitions for Students table
+  const studentColumns: ColumnDef<SchoolDetails['students'][0]>[] = useMemo(
+    () => [
+      {
+        accessorKey: "studentId",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Student ID
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm font-semibold text-gray-900 font-mono">
+              {row.getValue("studentId")}
+            </div>
+          );
+        },
+      },
+      {
+        id: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm font-semibold text-gray-900">
+              {row.original.firstName} {row.original.lastName}
+            </div>
+          );
+        },
+        sortingFn: (rowA, rowB) => {
+          const nameA = `${rowA.original.firstName} ${rowA.original.lastName}`;
+          const nameB = `${rowB.original.firstName} ${rowB.original.lastName}`;
+          return nameA.localeCompare(nameB);
+        },
+      },
+      {
+        accessorKey: "class",
+        header: "Class",
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm text-gray-600">
+              {row.getValue("class")}
+              {row.original.section && ` - ${row.original.section}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Status
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const status = row.getValue("status") as string;
+          return (
+            <Badge
+              className={
+                status === "active"
+                  ? "bg-green-100 text-green-700 border-green-200"
+                  : status === "graduated"
+                  ? "bg-blue-100 text-blue-700 border-blue-200"
+                  : "bg-gray-100 text-gray-700 border-gray-200"
+              }
+            >
+              {status}
+            </Badge>
+          );
+        },
+      },
+    ],
+    []
+  );
+
+  // Column definitions for Users table
+  const userColumns: ColumnDef<SchoolDetails['users'][0]>[] = useMemo(
+    () => [
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm font-semibold text-gray-900">
+              {row.getValue("name")}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "email",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Email
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return <div className="text-sm text-gray-600">{row.getValue("email")}</div>;
+        },
+      },
+      {
+        accessorKey: "role",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Role
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const role = row.getValue("role") as string;
+          return (
+            <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">
+              {role.replace("_", " ")}
+            </Badge>
+          );
+        },
+      },
+      {
+        accessorKey: "createdAt",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Created
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm text-gray-600">
+              {new Date(row.getValue("createdAt")).toLocaleDateString()}
+            </div>
+          );
+        },
+        sortingFn: (rowA, rowB) => {
+          const dateA = new Date(rowA.original.createdAt).getTime();
+          const dateB = new Date(rowB.original.createdAt).getTime();
+          return dateA - dateB;
+        },
+      },
+    ],
+    []
+  );
+
+  // Column definitions for Payments table
+  const paymentColumns: ColumnDef<SchoolDetails['payments'][0]>[] = useMemo(
+    () => [
+      {
+        id: "student",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Student
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const student = row.original.student;
+          return (
+            <div className="text-sm font-semibold text-gray-900">
+              {student ? `${student.firstName} ${student.lastName}` : <span className="text-gray-400">N/A</span>}
+            </div>
+          );
+        },
+        sortingFn: (rowA, rowB) => {
+          const nameA = rowA.original.student ? `${rowA.original.student.firstName} ${rowA.original.student.lastName}` : "";
+          const nameB = rowB.original.student ? `${rowB.original.student.firstName} ${rowB.original.student.lastName}` : "";
+          return nameA.localeCompare(nameB);
+        },
+      },
+      {
+        id: "feeStructure",
+        header: "Fee Structure",
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm text-gray-600">
+              {row.original.feeStructure?.name || <span className="text-gray-400">N/A</span>}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "amount",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Amount
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const amount = row.getValue("amount") as number;
+          return (
+            <div className="text-sm font-bold text-indigo-600">
+              ${amount.toLocaleString()}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "paymentMethod",
+        header: "Method",
+        cell: ({ row }) => {
+          const method = row.getValue("paymentMethod") as string;
+          return (
+            <div className="text-sm text-gray-600 capitalize">
+              {method.replace("_", " ")}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Status
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const status = row.getValue("status") as string;
+          return (
+            <Badge
+              className={
+                status === "completed"
+                  ? "bg-green-100 text-green-700 border-green-200"
+                  : status === "pending"
+                  ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                  : status === "failed"
+                  ? "bg-red-100 text-red-700 border-red-200"
+                  : "bg-gray-100 text-gray-700 border-gray-200"
+              }
+            >
+              {status}
+            </Badge>
+          );
+        },
+      },
+      {
+        accessorKey: "paymentDate",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Date
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm text-gray-600">
+              {new Date(row.getValue("paymentDate")).toLocaleDateString()}
+            </div>
+          );
+        },
+        sortingFn: (rowA, rowB) => {
+          const dateA = new Date(rowA.original.paymentDate).getTime();
+          const dateB = new Date(rowB.original.paymentDate).getTime();
+          return dateA - dateB;
+        },
+      },
+    ],
+    []
+  );
+
+  // Column definitions for Fee Structures table
+  const feeStructureColumns: ColumnDef<SchoolDetails['feeStructures'][0]>[] = useMemo(
+    () => [
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm font-semibold text-gray-900">
+              {row.getValue("name")}
+            </div>
+          );
+        },
+      },
+      {
+        id: "category",
+        header: "Category",
+        cell: ({ row }) => {
+          return (
+            <div className="text-sm text-gray-600">
+              {row.original.category?.name || <span className="text-gray-400">N/A</span>}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "amount",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Amount
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const amount = row.getValue("amount") as number;
+          return (
+            <div className="text-sm font-bold text-indigo-600">
+              ${amount.toLocaleString()}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "academicYear",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Academic Year
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return <div className="text-sm text-gray-600">{row.getValue("academicYear")}</div>;
+        },
+      },
+      {
+        accessorKey: "class",
+        header: "Class",
+        cell: ({ row }) => {
+          return <div className="text-sm text-gray-600">{row.getValue("class") || "All"}</div>;
+        },
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Status
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const status = row.getValue("status") as string;
+          return (
+            <Badge
+              className={
+                status === "active"
+                  ? "bg-green-100 text-green-700 border-green-200"
+                  : "bg-gray-100 text-gray-700 border-gray-200"
+              }
+            >
+              {status}
+            </Badge>
+          );
+        },
+      },
+    ],
+    []
+  );
 
   useEffect(() => {
     loadSchoolDetails();
@@ -448,62 +905,16 @@ export default function SchoolDetails() {
           </div>
         </CardHeader>
         <CardContent>
-        {students.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No students found</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Student ID
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Class
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {students.map((student) => (
-                  <tr
-                    key={student.id}
-                    className="hover:bg-indigo-50/50 transition-all duration-150 group"
-                  >
-                    <td className="px-4 py-2 text-sm font-semibold text-gray-900 font-mono">
-                      {student.studentId}
-                    </td>
-                    <td className="px-4 py-2 text-sm font-semibold text-gray-900">
-                      {student.firstName} {student.lastName}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {student.class}
-                      {student.section && ` - ${student.section}`}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Badge
-                        className={
-                          student.status === "active"
-                            ? "bg-green-100 text-green-700 border-green-200"
-                            : student.status === "graduated"
-                            ? "bg-blue-100 text-blue-700 border-blue-200"
-                            : "bg-gray-100 text-gray-700 border-gray-200"
-                        }
-                      >
-                        {student.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          <DataTable
+            columns={studentColumns}
+            data={students}
+            searchKey="studentId"
+            searchPlaceholder="Search students..."
+            enableRowSelection={false}
+            exportFileName={`school-${school.id}-students`}
+            exportTitle={`Students - ${school.name}`}
+            enableExport={true}
+          />
         </CardContent>
       </Card>
 
@@ -515,53 +926,16 @@ export default function SchoolDetails() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-        {users.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No users found</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Created
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {users.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="hover:bg-indigo-50/50 transition-all duration-150 group"
-                  >
-                    <td className="px-4 py-2 text-sm font-semibold text-gray-900">
-                      {user.name}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {user.email}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">
-                        {user.role.replace("_", " ")}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          <DataTable
+            columns={userColumns}
+            data={users}
+            searchKey="name"
+            searchPlaceholder="Search users..."
+            enableRowSelection={false}
+            exportFileName={`school-${school.id}-users`}
+            exportTitle={`Users - ${school.name}`}
+            enableExport={true}
+          />
         </CardContent>
       </Card>
 
@@ -578,81 +952,16 @@ export default function SchoolDetails() {
           </div>
         </CardHeader>
         <CardContent>
-        {payments.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No payments found</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Student
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Fee Structure
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Method
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {payments.map((payment) => (
-                  <tr
-                    key={payment.id}
-                    className="hover:bg-indigo-50/50 transition-all duration-150 group"
-                  >
-                    <td className="px-4 py-2 text-sm font-semibold text-gray-900">
-                      {payment.student ? (
-                        `${payment.student.firstName} ${payment.student.lastName}`
-                      ) : (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {payment.feeStructure?.name || (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-sm font-bold text-indigo-600">
-                      ${payment.amount.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600 capitalize">
-                      {payment.paymentMethod.replace("_", " ")}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Badge
-                        className={
-                          payment.status === "completed"
-                            ? "bg-green-100 text-green-700 border-green-200"
-                            : payment.status === "pending"
-                            ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                            : payment.status === "failed"
-                            ? "bg-red-100 text-red-700 border-red-200"
-                            : "bg-gray-100 text-gray-700 border-gray-200"
-                        }
-                      >
-                        {payment.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {new Date(payment.paymentDate).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          <DataTable
+            columns={paymentColumns}
+            data={payments}
+            searchKey="feeStructure"
+            searchPlaceholder="Search payments..."
+            enableRowSelection={false}
+            exportFileName={`school-${school.id}-payments`}
+            exportTitle={`Payments - ${school.name}`}
+            enableExport={true}
+          />
         </CardContent>
       </Card>
 
@@ -664,75 +973,16 @@ export default function SchoolDetails() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-        {feeStructures.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">
-            No fee structures found
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Academic Year
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Class
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {feeStructures.map((fs) => (
-                  <tr
-                    key={fs.id}
-                    className="hover:bg-indigo-50/50 transition-all duration-150 group"
-                  >
-                    <td className="px-4 py-2 text-sm font-semibold text-gray-900">
-                      {fs.name}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {fs.category?.name || (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-sm font-bold text-indigo-600">
-                      ${fs.amount.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {fs.academicYear}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-600">
-                      {fs.class || "All"}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Badge
-                        className={
-                          fs.status === "active"
-                            ? "bg-green-100 text-green-700 border-green-200"
-                            : "bg-gray-100 text-gray-700 border-gray-200"
-                        }
-                      >
-                        {fs.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          <DataTable
+            columns={feeStructureColumns}
+            data={feeStructures}
+            searchKey="name"
+            searchPlaceholder="Search fee structures..."
+            enableRowSelection={false}
+            exportFileName={`school-${school.id}-fee-structures`}
+            exportTitle={`Fee Structures - ${school.name}`}
+            enableExport={true}
+          />
         </CardContent>
       </Card>
 

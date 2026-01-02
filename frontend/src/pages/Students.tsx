@@ -4,7 +4,14 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
 import Layout from '../components/Layout';
-import Modal from '../components/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { studentsService } from '../services/students.service';
 import { academicYearsService } from '../services/academicYears.service';
 import { studentAcademicRecordsService } from '../services/studentAcademicRecords.service';
@@ -560,109 +567,120 @@ export default function Students() {
         )}
 
 
-        {/* Academic Record Modal */}
-        <Modal
-          isOpen={showAcademicRecordModal}
-          onClose={() => {
-            setShowAcademicRecordModal(false);
-            setSelectedStudent(null);
-            setAcademicRecordData({ classId: '', section: '', rollNumber: '' });
-            setError('');
+        {/* Academic Record Dialog */}
+        <Dialog
+          open={showAcademicRecordModal}
+          onOpenChange={(open) => {
+            setShowAcademicRecordModal(open);
+            if (!open) {
+              setSelectedStudent(null);
+              setAcademicRecordData({ classId: '', section: '', rollNumber: '' });
+              setError('');
+            }
           }}
-          title={`Assign Class - ${selectedStudent?.firstName} ${selectedStudent?.lastName}`}
         >
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded-r-lg">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-          <form onSubmit={handleAcademicRecordSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Academic Year
-              </label>
-              <Input
-                type="text"
-                value={currentAcademicYear?.name || 'N/A'}
-                disabled
-                className="bg-gray-100"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Class *
-              </label>
-              <Select
-                key={`class-select-${classes.length}`}
-                value={academicRecordData.classId}
-                onValueChange={(value) => setAcademicRecordData({ ...academicRecordData, classId: value })}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(() => {
-                    return Array.isArray(classes) && classes.length > 0 ? (
-                      classes.map((cls) => (
-                        <SelectItem key={cls.id} value={cls.id.toString()}>
-                          {cls.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        {classes?.length === 0 ? 'No classes available' : 'Loading classes...'}
-                      </div>
-                    );
-                  })()}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>
+                Assign Class - {selectedStudent?.firstName} {selectedStudent?.lastName}
+              </DialogTitle>
+              <DialogDescription>
+                Assign this student to a class for the current academic year
+              </DialogDescription>
+            </DialogHeader>
+            {error && (
+              <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-r-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+            <form onSubmit={handleAcademicRecordSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Section
+                  Academic Year
                 </label>
                 <Input
                   type="text"
-                  value={academicRecordData.section}
-                  onChange={(e) => setAcademicRecordData({ ...academicRecordData, section: e.target.value })}
-                  placeholder="A"
+                  value={currentAcademicYear?.name || 'N/A'}
+                  disabled
+                  className="bg-gray-100"
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Roll Number
+                  Class *
                 </label>
-                <Input
-                  type="text"
-                  value={academicRecordData.rollNumber}
-                  onChange={(e) => setAcademicRecordData({ ...academicRecordData, rollNumber: e.target.value })}
-                  placeholder="001"
-                />
+                <Select
+                  key={`class-select-${classes.length}`}
+                  value={academicRecordData.classId}
+                  onValueChange={(value) => setAcademicRecordData({ ...academicRecordData, classId: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      return Array.isArray(classes) && classes.length > 0 ? (
+                        classes.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id.toString()}>
+                            {cls.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          {classes?.length === 0 ? 'No classes available' : 'Loading classes...'}
+                        </div>
+                      );
+                    })()}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowAcademicRecordModal(false);
-                  setSelectedStudent(null);
-                  setAcademicRecordData({ classId: '', section: '', rollNumber: '' });
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
-              >
-                Assign Class
-              </Button>
-            </div>
-          </form>
-        </Modal>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Section
+                  </label>
+                  <Input
+                    type="text"
+                    value={academicRecordData.section}
+                    onChange={(e) => setAcademicRecordData({ ...academicRecordData, section: e.target.value })}
+                    placeholder="A"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Roll Number
+                  </label>
+                  <Input
+                    type="text"
+                    value={academicRecordData.rollNumber}
+                    onChange={(e) => setAcademicRecordData({ ...academicRecordData, rollNumber: e.target.value })}
+                    placeholder="001"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowAcademicRecordModal(false);
+                    setSelectedStudent(null);
+                    setAcademicRecordData({ classId: '', section: '', rollNumber: '' });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"
+                >
+                  Assign Class
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

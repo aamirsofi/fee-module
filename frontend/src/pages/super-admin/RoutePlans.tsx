@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   FiLoader,
   FiEdit,
   FiTrash2,
-  FiSearch,
-  FiX,
   FiDownload,
   FiUpload,
 } from "react-icons/fi";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -42,7 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import Pagination from "../../components/Pagination";
+import { DataTable } from "@/components/DataTable";
 import { useRoutePlanData } from "../../hooks/pages/super-admin/useRoutePlanData";
 import { useRoutePlanImport } from "../../hooks/pages/super-admin/useRoutePlanImport";
 import { routePlanService } from "../../services/routePlanService";
@@ -381,7 +381,7 @@ export default function RoutePlans() {
     setRoutePlanDeleteDialogOpen(true);
   };
 
-  const handleRoutePlanDelete = async () => {
+  const handleRoutePlanDelete = useCallback(async () => {
     if (!routePlanDeleteItem) return;
 
     try {
@@ -395,13 +395,196 @@ export default function RoutePlans() {
       setRoutePlanDeleteItem(null);
       refetchRoutePlans();
       setTimeout(() => setSuccess(""), 5000);
-    } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.message || "Failed to delete route plan";
+    } catch (err: unknown) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err && err.response && typeof err.response === 'object' && 'data' in err.response && err.response.data && typeof err.response.data === 'object' && 'message' in err.response.data && typeof err.response.data.message === 'string'
+        ? err.response.data.message
+        : "Failed to delete route plan";
       setError(errorMessage);
       setTimeout(() => setError(""), 5000);
     }
-  };
+  }, [routePlanDeleteItem, refetchRoutePlans]);
+
+  const handleRoutePlanDeleteClickCallback = useCallback((id: number, schoolId: number) => {
+    handleRoutePlanDeleteClick(id, schoolId);
+  }, []);
+
+  const handlePaginationChange = useCallback((pageIndex: number, pageSize: number) => {
+    setRoutePlanPage(pageIndex + 1);
+    setRoutePlanLimit(pageSize);
+  }, []);
+
+  const handleSearchChange = useCallback((searchValue: string) => {
+    setRoutePlanSearch(searchValue);
+    setRoutePlanPage(1);
+  }, []);
+
+  const columns: ColumnDef<RoutePlan>[] = useMemo(
+    () => [
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          return <div className="font-semibold">{row.getValue("name")}</div>;
+        },
+      },
+      {
+        accessorKey: "school",
+        header: "School",
+        cell: ({ row }) => {
+          const school = row.original.school;
+          return (
+            <div className="text-sm text-gray-600">
+              {school?.name || `School ID: ${row.original.schoolId}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "route",
+        header: "Route",
+        cell: ({ row }) => {
+          const route = row.original.route;
+          return (
+            <div className="text-sm text-gray-600">
+              {route?.name || `Route ID: ${row.original.routeId}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "feeCategory",
+        header: "Fee Heading",
+        cell: ({ row }) => {
+          const feeCategory = row.original.feeCategory;
+          return (
+            <div className="text-sm text-gray-600">
+              {feeCategory?.name || `Fee ID: ${row.original.feeCategoryId}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "categoryHead",
+        header: "Category Head",
+        cell: ({ row }) => {
+          const categoryHead = row.original.categoryHead;
+          return (
+            <div className="text-sm text-gray-600">
+              {categoryHead?.name || "General"}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "class",
+        header: "Class",
+        cell: ({ row }) => {
+          const classItem = row.original.class;
+          return (
+            <div className="text-sm text-gray-600">
+              {classItem?.name || `Class ID: ${row.original.classId || "-"}`}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "amount",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Amount
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const amount = parseFloat(row.getValue("amount") as string);
+          return <div className="text-sm font-semibold">₹{amount.toFixed(2)}</div>;
+        },
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-8 px-2 lg:px-3"
+            >
+              Status
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const status = row.getValue("status") as string;
+          return (
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                status === "active"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {status}
+            </span>
+          );
+        },
+        filterConfig: {
+          column: "status",
+          title: "Status",
+          options: [
+            { label: "Active", value: "active" },
+            { label: "Inactive", value: "inactive" },
+          ],
+        },
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => {
+          const plan = row.original;
+          return (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRoutePlanEdit(plan)}
+                className="h-8 w-8 p-0"
+              >
+                <FiEdit className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRoutePlanDeleteClickCallback(plan.id, plan.schoolId)}
+                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+              >
+                <FiTrash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
+    ],
+    [handleRoutePlanDeleteClickCallback]
+  );
 
   const handleRoutePlanCancel = () => {
     setEditingRoutePlan(null);
@@ -1433,36 +1616,6 @@ export default function RoutePlans() {
                 {/* Right Side - List */}
                 <Card className="lg:col-span-2">
                   <CardContent className="pt-6">
-                    {/* Search */}
-                    <div className="mb-4">
-                      <div className="relative">
-                        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <Input
-                          type="text"
-                          value={routePlanSearch}
-                          onChange={(e) => {
-                            setRoutePlanSearch(e.target.value);
-                            setRoutePlanPage(1);
-                          }}
-                          placeholder="Search by name or description..."
-                          className="w-full pl-10 pr-10"
-                        />
-                        {routePlanSearch && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setRoutePlanSearch("");
-                              setRoutePlanPage(1);
-                            }}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 h-auto p-1 text-gray-400 hover:text-gray-600"
-                          >
-                            <FiX className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
                     {/* Table */}
                     {loadingRoutePlans ? (
                       <div className="flex items-center justify-center py-12">
@@ -1471,137 +1624,25 @@ export default function RoutePlans() {
                           Loading route plans...
                         </span>
                       </div>
-                    ) : routePlans.length === 0 ? (
-                      <div className="text-center py-12 text-gray-500">
-                        No route plans found. Create your first route plan!
-                      </div>
                     ) : (
-                      <>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  Name
-                                </th>
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  School
-                                </th>
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  Route
-                                </th>
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  Fee Heading
-                                </th>
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  Category Head
-                                </th>
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  Class
-                                </th>
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  Amount
-                                </th>
-                                <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                  Status
-                                </th>
-                                <th className="text-right py-2 px-3 font-semibold text-gray-700">
-                                  Actions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {routePlans.map((plan) => (
-                                <tr
-                                  key={plan.id}
-                                  className="border-b border-gray-100 hover:bg-gray-50"
-                                >
-                                  <td className="py-2 px-3 font-semibold">
-                                    {plan.name}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    {plan.school?.name ||
-                                      `School ID: ${plan.schoolId}`}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    {plan.route?.name ||
-                                      `Route ID: ${plan.routeId}`}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    {plan.feeCategory?.name ||
-                                      `Fee ID: ${plan.feeCategoryId}`}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    {plan.categoryHead?.name || "General"}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    {plan.class?.name ||
-                                      `Class ID: ${plan.classId}`}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    ₹
-                                    {parseFloat(plan.amount.toString()).toFixed(
-                                      2
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <span
-                                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        plan.status === "active"
-                                          ? "bg-green-100 text-green-800"
-                                          : "bg-gray-100 text-gray-800"
-                                      }`}
-                                    >
-                                      {plan.status}
-                                    </span>
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRoutePlanEdit(plan)
-                                        }
-                                        className="h-8 w-8 p-0"
-                                      >
-                                        <FiEdit className="w-4 h-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRoutePlanDeleteClick(
-                                            plan.id,
-                                            plan.schoolId
-                                          )
-                                        }
-                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                      >
-                                        <FiTrash2 className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Pagination */}
-                        {routePlanPaginationMeta && (
-                          <div className="mt-4">
-                            <Pagination
-                              paginationMeta={routePlanPaginationMeta}
-                              page={routePlanPage}
-                              limit={routePlanLimit}
-                              onPageChange={setRoutePlanPage}
-                              onLimitChange={setRoutePlanLimit}
-                              itemName="route plans"
-                            />
-                          </div>
-                        )}
-                      </>
+                      <DataTable
+                        columns={columns}
+                        data={routePlans}
+                        searchKey="name"
+                        searchPlaceholder="Search route plans..."
+                        enableRowSelection={false}
+                        manualPagination={true}
+                        pageCount={routePlanPaginationMeta?.totalPages || 0}
+                        totalRows={routePlanPaginationMeta?.total || 0}
+                        onPaginationChange={handlePaginationChange}
+                        onSearchChange={handleSearchChange}
+                        externalPageIndex={routePlanPage - 1}
+                        externalPageSize={routePlanLimit}
+                        externalSearchValue={routePlanSearch}
+                        exportFileName="route-plans"
+                        exportTitle="Route Plans List"
+                        enableExport={true}
+                      />
                     )}
                   </CardContent>
                 </Card>
