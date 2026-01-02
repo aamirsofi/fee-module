@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from "../../services/api";
 import {
   useRoutesData,
   Route,
 } from "../../hooks/pages/super-admin/useRoutesData";
+import { useSchool } from "../../contexts/SchoolContext";
 import RoutesForm from "./components/RoutesForm";
 import RoutesFilters from "./components/RoutesFilters";
 import RoutesTable from "./components/RoutesTable";
@@ -12,6 +14,14 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 export default function RouteHeading() {
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
@@ -26,7 +36,7 @@ export default function RouteHeading() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string | number>("");
+  const { selectedSchoolId } = useSchool();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState<{
     id: number;
@@ -39,13 +49,11 @@ export default function RouteHeading() {
     paginationMeta,
     loadingRoutes,
     refetchRoutes,
-    schools,
-    loadingSchools,
   } = useRoutesData({
     page,
     limit,
     search,
-    selectedSchoolId,
+    selectedSchoolId: selectedSchoolId || "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,9 +115,16 @@ export default function RouteHeading() {
       name: "",
       description: "",
       status: "active",
-      schoolId: retainSchool && schoolId ? schoolId : "",
+      schoolId: retainSchool && schoolId ? schoolId : (selectedSchoolId || ""),
     });
   };
+
+  // Auto-set schoolId from context when creating new route
+  useEffect(() => {
+    if (!editingRoute && selectedSchoolId && formData.schoolId === "") {
+      setFormData({ ...formData, schoolId: selectedSchoolId });
+    }
+  }, [selectedSchoolId, editingRoute]);
 
   const handleEdit = (route: Route) => {
     setEditingRoute(route);
@@ -158,6 +173,27 @@ export default function RouteHeading() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/super-admin/dashboard">Dashboard</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/super-admin/settings/fee-settings/route-plan">Route Plans</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Define Routes</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       {/* Success/Error Messages */}
       {success && (
         <Card className="border-l-4 border-l-green-400 bg-green-50">
@@ -180,8 +216,6 @@ export default function RouteHeading() {
           formData={formData}
           setFormData={setFormData}
           editingRoute={editingRoute}
-          schools={schools}
-          loadingSchools={loadingSchools}
           handleSubmit={handleSubmit}
           handleCancel={handleCancel}
         />
@@ -193,9 +227,6 @@ export default function RouteHeading() {
             <RoutesFilters
               search={search}
               setSearch={setSearch}
-              selectedSchoolId={selectedSchoolId}
-              setSelectedSchoolId={setSelectedSchoolId}
-              schools={schools}
               setPage={setPage}
             />
 

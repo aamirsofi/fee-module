@@ -200,9 +200,9 @@ export default function Students() {
   const handleEdit = useCallback((student: Student) => {
     // Include schoolId in URL for super admin when editing
     if (user?.role === 'super_admin' && selectedSchoolId) {
-      navigate(`/students/${student.id}/edit?schoolId=${selectedSchoolId}`);
+      navigate(`/super-admin/students/${student.id}/edit?schoolId=${selectedSchoolId}`);
     } else {
-      navigate(`/students/${student.id}/edit`);
+      navigate(`/super-admin/students/${student.id}/edit`);
     }
   }, [user, selectedSchoolId, navigate]);
 
@@ -439,10 +439,10 @@ export default function Students() {
                         alert('Please select a school from the top navigation bar before adding a student.');
                         return;
                       }
-                      const url = `/students/new?schoolId=${selectedSchoolId}`;
+                      const url = `/super-admin/students/new?schoolId=${selectedSchoolId}`;
                       navigate(url);
                     } else {
-                      navigate('/students/new');
+                      navigate('/super-admin/students/new');
                     }
                   }}
                   disabled={
@@ -534,9 +534,9 @@ export default function Students() {
                       alert('Please select a school from the top navigation bar before adding a student.');
                       return;
                     }
-                    navigate(`/students/new?schoolId=${selectedSchoolId}`);
+                    navigate(`/super-admin/students/new?schoolId=${selectedSchoolId}`);
                   } else {
-                    navigate('/students/new');
+                    navigate('/super-admin/students/new');
                   }
                 }}
                 className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700"

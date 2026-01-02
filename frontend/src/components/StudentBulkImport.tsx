@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { FiUpload, FiX } from "react-icons/fi";
+import { FiUpload, FiX, FiDownload } from "react-icons/fi";
 import api from "../services/api";
 
 interface StudentBulkImportProps {
@@ -36,7 +36,6 @@ const StudentBulkImport: React.FC<StudentBulkImportProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [previewData, setPreviewData] = useState<ParsedStudent[]>([]);
   const [previewColumns, setPreviewColumns] = useState<string[]>([]);
-  const [showPreview, setShowPreview] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -264,7 +263,6 @@ const StudentBulkImport: React.FC<StudentBulkImportProps> = ({
         setPreviewData(data);
         setPreviewColumns(columns);
         setSelectedFile(file); // Store file reference
-        setShowPreview(true);
       } catch (error: any) {
         onImportError(error.message || "Failed to parse CSV file");
       }
@@ -276,7 +274,6 @@ const StudentBulkImport: React.FC<StudentBulkImportProps> = ({
     if (!selectedFile) return;
 
     setIsUploading(true);
-    setShowPreview(false);
 
     try {
       const students = await parseFullCsv(selectedFile);
@@ -304,6 +301,8 @@ const StudentBulkImport: React.FC<StudentBulkImportProps> = ({
       setImportResult(response.data);
       setShowResults(true);
       setSelectedFile(null);
+      setPreviewData([]);
+      setPreviewColumns([]);
       onImportSuccess();
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || "Failed to import students";
@@ -312,6 +311,87 @@ const StudentBulkImport: React.FC<StudentBulkImportProps> = ({
       setIsUploading(false);
     }
   }, [selectedFile, schoolId, parseFullCsv, onImportSuccess, onImportError]);
+
+  const downloadSampleCSV = useCallback(() => {
+    // Sample CSV data
+    const sampleData = [
+      {
+        studentId: "STU001",
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@example.com",
+        phone: "+1234567890",
+        address: "123 Main St",
+        class: "10th Grade",
+        section: "A",
+        status: "active",
+      },
+      {
+        studentId: "STU002",
+        firstName: "Jane",
+        lastName: "Smith",
+        email: "jane.smith@example.com",
+        phone: "+1234567891",
+        address: "456 Oak Ave",
+        class: "10th Grade",
+        section: "B",
+        status: "active",
+      },
+      {
+        studentId: "STU003",
+        firstName: "Bob",
+        lastName: "Johnson",
+        email: "bob.johnson@example.com",
+        phone: "+1234567892",
+        address: "789 Pine Rd",
+        class: "11th Grade",
+        section: "A",
+        status: "active",
+      },
+    ];
+
+    // CSV headers
+    const headers = [
+      "studentId",
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "address",
+      "class",
+      "section",
+      "status",
+    ];
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...sampleData.map((row) =>
+        headers
+          .map((header) => {
+            const value = row[header as keyof typeof row] || "";
+            // Escape commas and quotes in values
+            if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+              return `"${String(value).replace(/"/g, '""')}"`;
+            }
+            return value;
+          })
+          .join(",")
+      ),
+    ].join("\n");
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "sample_students.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, []);
 
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -330,6 +410,16 @@ const StudentBulkImport: React.FC<StudentBulkImportProps> = ({
     <>
       {/* Upload Area */}
       <div className="card-modern rounded-xl p-6">
+        <div className="flex justify-end mb-4">
+          <button
+            type="button"
+            onClick={downloadSampleCSV}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-smooth"
+          >
+            <FiDownload className="w-4 h-4" />
+            Download Sample CSV
+          </button>
+        </div>
         <div
           {...getRootProps()}
           className={`
@@ -379,72 +469,79 @@ const StudentBulkImport: React.FC<StudentBulkImportProps> = ({
         </div>
       </div>
 
-      {/* Preview Modal */}
-      {showPreview && previewData.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="card-modern rounded-2xl p-6 max-w-5xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold mb-2 text-gray-800">Preview CSV Data</h2>
-                <p className="text-sm text-gray-600">
-                  Review the data before importing ({previewData.length} rows preview)
-                </p>
-              </div>
-              <button
-                onClick={() => setShowPreview(false)}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-smooth"
-              >
-                <FiX className="w-6 h-6" />
-              </button>
+      {/* Preview Section - Inline */}
+      {previewData.length > 0 && (
+        <div className="card-modern rounded-xl p-6 space-y-4 mt-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">Preview CSV Data</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Review the data before importing ({previewData.length} rows preview)
+              </p>
             </div>
+            <button
+              onClick={() => {
+                setPreviewData([]);
+                setPreviewColumns([]);
+                setSelectedFile(null);
+              }}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-smooth"
+            >
+              <FiX className="w-5 h-5" />
+            </button>
+          </div>
 
-            <div className="mb-6 overflow-x-auto rounded-xl border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-indigo-50 to-purple-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Student ID</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">First Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Last Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Phone</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Address</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Class</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Section</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Status</th>
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-indigo-50 to-purple-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Student ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">First Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Last Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Phone</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Address</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Class</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Section</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {previewData.map((row, index) => (
+                  <tr key={index} className="hover:bg-indigo-50/50">
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.studentId || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.firstName || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.lastName || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.email || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.phone || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.address || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.class || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.section || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{row.status || "-"}</td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {previewData.map((row, index) => (
-                    <tr key={index} className="hover:bg-indigo-50/50">
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.studentId || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.firstName || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.lastName || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.email || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.phone || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.address || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.class || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.section || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{row.status || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowPreview(false)}
-                className="px-6 py-3 rounded-xl font-semibold bg-white text-gray-700 hover:bg-gray-50 shadow-md transition-smooth"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmImport}
-                className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl transition-all"
-              >
-                Import All Rows
-              </button>
-            </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              onClick={() => {
+                setPreviewData([]);
+                setPreviewColumns([]);
+                setSelectedFile(null);
+              }}
+              className="px-6 py-3 rounded-xl font-semibold bg-white text-gray-700 hover:bg-gray-50 shadow-md transition-smooth border border-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmImport}
+              disabled={isUploading}
+              className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUploading ? "Importing..." : "Import All Rows"}
+            </button>
           </div>
         </div>
       )}

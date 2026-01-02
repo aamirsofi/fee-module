@@ -140,10 +140,10 @@ export default function Layout({ children }: LayoutProps) {
       icon: FiUsers,
       section: "students",
       children: [
-        { name: "All Students", path: "/students", icon: FiUsers },
+        { name: "All Students", path: "/super-admin/students", icon: FiUsers },
         {
           name: "Bulk Import Students",
-          path: "/students/bulk-import",
+          path: "/super-admin/students/bulk-import",
           icon: FiUpload,
         },
       ],
@@ -359,9 +359,9 @@ export default function Layout({ children }: LayoutProps) {
     },
     {
       name: "Students",
-      path: "/students",
+      path: "/super-admin/students",
       icon: FiUsers,
-      roles: ["administrator"],
+      roles: ["super_admin"],
     },
     {
       name: "Fee Structures",

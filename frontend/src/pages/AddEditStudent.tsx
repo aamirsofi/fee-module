@@ -31,7 +31,7 @@ export default function AddEditStudent() {
     if (user?.role === 'super_admin' && !id && !schoolIdFromUrl) {
       // Redirect back to students list with message
       alert('Please select a school from the dropdown before adding a student.');
-      navigate('/students', { replace: true });
+      navigate('/super-admin/students', { replace: true });
     }
   }, [id, schoolIdFromUrl, navigate]);
 
@@ -47,7 +47,7 @@ export default function AddEditStudent() {
       const student = await studentsService.getById(parseInt(id!));
       setEditingStudent(student);
     } catch (err) {
-      navigate('/students');
+      navigate('/super-admin/students');
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ export default function AddEditStudent() {
     const successMessage = id 
       ? 'Student updated successfully!' 
       : 'Student created successfully!';
-    navigate(`/students?success=${encodeURIComponent(successMessage)}`);
+    navigate(`/super-admin/students?success=${encodeURIComponent(successMessage)}`);
   };
 
   const handleClose = () => {
@@ -88,7 +88,7 @@ export default function AddEditStudent() {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to="/students">Students</Link>
+                <Link to="/super-admin/students">Students</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />

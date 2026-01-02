@@ -357,7 +357,7 @@ export default function MultiStepStudentForm({
         setError("Please select a school from the dropdown on the Students page before adding a student. You will be redirected back.");
         // Redirect after a short delay
         setTimeout(() => {
-          window.location.href = '/students';
+          window.location.href = '/super-admin/students';
         }, 2000);
         return;
       }
@@ -928,8 +928,8 @@ export default function MultiStepStudentForm({
 
   // Check if we're on the AddEditStudent page (full page mode) or modal mode
   const isFullPageMode =
-    window.location.pathname.includes("/students/new") ||
-    (window.location.pathname.includes("/students/") &&
+    window.location.pathname.includes("/super-admin/students/new") ||
+    (window.location.pathname.includes("/super-admin/students/") &&
       window.location.pathname.includes("/edit"));
 
   const cardContent = (

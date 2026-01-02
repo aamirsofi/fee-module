@@ -1,6 +1,6 @@
-import { FiLoader } from "react-icons/fi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -8,8 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School } from "../../../services/schoolService";
+import { useSchool } from "../../../contexts/SchoolContext";
 import { Route } from "../../../hooks/pages/super-admin/useRoutesData";
+import { useEffect } from "react";
 
 interface RoutesFormProps {
   formData: {
@@ -27,8 +28,6 @@ interface RoutesFormProps {
     }>
   >;
   editingRoute: Route | null;
-  schools: School[];
-  loadingSchools: boolean;
   handleSubmit: (e: React.FormEvent) => void;
   handleCancel: () => void;
 }
@@ -37,11 +36,18 @@ export default function RoutesForm({
   formData,
   setFormData,
   editingRoute,
-  schools,
-  loadingSchools,
   handleSubmit,
   handleCancel,
 }: RoutesFormProps) {
+  const { selectedSchool, selectedSchoolId } = useSchool();
+
+  // Auto-set schoolId from context when creating new route
+  useEffect(() => {
+    if (!editingRoute && selectedSchoolId && formData.schoolId === "") {
+      setFormData({ ...formData, schoolId: selectedSchoolId });
+    }
+  }, [selectedSchoolId, editingRoute]);
+
   return (
     <Card>
       <CardHeader>
@@ -56,37 +62,16 @@ export default function RoutesForm({
             <label className="block text-xs font-medium text-gray-700 mb-0.5">
               School <span className="text-red-500">*</span>
             </label>
-            {loadingSchools ? (
-              <div className="flex items-center justify-center py-2">
-                <FiLoader className="w-3 h-3 animate-spin text-indigo-600" />
-                <span className="ml-1.5 text-xs text-gray-600">Loading...</span>
-              </div>
-            ) : (
-              <Select
-                value={
-                  formData.schoolId && formData.schoolId !== ""
-                    ? formData.schoolId.toString()
-                    : undefined
-                }
-                onValueChange={(value) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    schoolId: value ? parseInt(value) : "",
-                  }));
-                }}
-                disabled={!!editingRoute}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a school..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {schools.map((school) => (
-                    <SelectItem key={school.id} value={school.id.toString()}>
-                      {school.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Input
+              type="text"
+              value={selectedSchool?.name || "No school selected"}
+              disabled
+              className="bg-gray-50 cursor-not-allowed text-xs"
+            />
+            {!selectedSchool && (
+              <p className="text-xs text-red-500 mt-1">
+                Please select a school from the top navigation bar
+              </p>
             )}
           </div>
 

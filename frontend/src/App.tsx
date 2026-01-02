@@ -81,7 +81,7 @@ function App() {
                 }
               />
               <Route
-                path="/students/bulk-import"
+                path="/super-admin/students/bulk-import"
                 element={
                   <ProtectedLayoutRoute>
                     <BulkImportStudents />
@@ -212,7 +212,7 @@ function App() {
               />
 
               <Route
-                path="/students"
+                path="/super-admin/students"
                 element={
                   <ProtectedRoute>
                     <Students />
@@ -220,7 +220,7 @@ function App() {
                 }
               />
               <Route
-                path="/students/new"
+                path="/super-admin/students/new"
                 element={
                   <ProtectedRoute>
                     <AddEditStudent />
@@ -228,7 +228,7 @@ function App() {
                 }
               />
               <Route
-                path="/students/:id/edit"
+                path="/super-admin/students/:id/edit"
                 element={
                   <ProtectedRoute>
                     <AddEditStudent />
