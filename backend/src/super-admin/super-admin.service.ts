@@ -1307,6 +1307,7 @@ export class SuperAdminService {
   async removeRoutePlan(id: number, schoolId: number) {
     const routePlan = await this.routePlansRepository.findOne({
       where: { id },
+      relations: ['feeCategory'],
     });
 
     if (!routePlan) {
@@ -1318,7 +1319,40 @@ export class SuperAdminService {
       throw new BadRequestException(`Route plan does not belong to school with ID ${schoolId}`);
     }
 
-    // TODO: Check if route plan has associated payments or student assignments before deleting
+    // Check if route plan has associated fee structures (transport fees)
+    // Route plans define transport fees, and fee structures may use the same fee category
+    const feeStructuresUsingCategory = await this.feeStructuresRepository.find({
+      where: {
+        feeCategoryId: routePlan.feeCategoryId,
+        schoolId: schoolId,
+      },
+      relations: ['payments', 'studentStructures'],
+    });
+
+    if (feeStructuresUsingCategory.length > 0) {
+      // Count total payments and student assignments
+      let totalPayments = 0;
+      let totalStudentAssignments = 0;
+
+      for (const feeStructure of feeStructuresUsingCategory) {
+        totalPayments += feeStructure.payments?.length || 0;
+        totalStudentAssignments += feeStructure.studentStructures?.length || 0;
+      }
+
+      const issues: string[] = [];
+      if (totalPayments > 0) {
+        issues.push(`${totalPayments} payment(s)`);
+      }
+      if (totalStudentAssignments > 0) {
+        issues.push(`${totalStudentAssignments} student assignment(s)`);
+      }
+
+      if (issues.length > 0) {
+        throw new BadRequestException(
+          `Cannot delete route plan. It is associated with ${feeStructuresUsingCategory.length} fee structure(s) that have ${issues.join(' and ')}. Please remove or reassign them first.`,
+        );
+      }
+    }
 
     await this.routePlansRepository.remove(routePlan);
     return { message: 'Route plan deleted successfully' };

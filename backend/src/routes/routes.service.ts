@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Route } from './entities/route.entity';
 import { CreateRouteDto } from './dto/create-route.dto';
 import { UpdateRouteDto } from './dto/update-route.dto';
+import { RoutePlan } from '../route-plans/entities/route-plan.entity';
 import { getPaginationParams, createPaginatedResponse } from '../common/utils/pagination.util';
 
 @Injectable()
@@ -11,6 +12,8 @@ export class RoutesService {
   constructor(
     @InjectRepository(Route)
     private routesRepository: Repository<Route>,
+    @InjectRepository(RoutePlan)
+    private routePlansRepository: Repository<RoutePlan>,
   ) {}
 
   async create(
@@ -118,7 +121,18 @@ export class RoutesService {
 
   async remove(id: number, schoolId?: number): Promise<void> {
     const route = await this.findOne(id, schoolId);
-    // TODO: Check if route is being used by any route plans before deleting
+    
+    // Check if route is being used by any route plans
+    const routePlansUsingRoute = await this.routePlansRepository.find({
+      where: { routeId: id },
+    });
+
+    if (routePlansUsingRoute.length > 0) {
+      throw new BadRequestException(
+        `Cannot delete route. It is being used by ${routePlansUsingRoute.length} route plan(s). Please remove or reassign the route plans first.`,
+      );
+    }
+
     await this.routesRepository.remove(route);
   }
 }
