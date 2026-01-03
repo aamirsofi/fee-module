@@ -20,6 +20,8 @@ import Classes from "./pages/super-admin/Classes";
 import RoutePlans from "./pages/super-admin/RoutePlans";
 import AcademicYears from "./pages/super-admin/AcademicYears";
 import Announcements from "./pages/super-admin/Announcements";
+import Analytics from "./pages/super-admin/Analytics";
+import Reports from "./pages/super-admin/Reports";
 import Profile from "./pages/Profile";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ProtectedLayoutRoute from "./components/ProtectedLayoutRoute";
@@ -197,6 +199,58 @@ function App() {
                 element={
                   <ProtectedLayoutRoute>
                     <Announcements />
+                  </ProtectedLayoutRoute>
+                }
+              />
+
+              {/* Analytics */}
+              <Route
+                path="/super-admin/analytics"
+                element={
+                  <ProtectedLayoutRoute>
+                    <Analytics />
+                  </ProtectedLayoutRoute>
+                }
+              />
+              <Route
+                path="/super-admin/analytics/revenue"
+                element={
+                  <ProtectedLayoutRoute>
+                    <Analytics />
+                  </ProtectedLayoutRoute>
+                }
+              />
+              <Route
+                path="/super-admin/analytics/schools"
+                element={
+                  <ProtectedLayoutRoute>
+                    <Analytics />
+                  </ProtectedLayoutRoute>
+                }
+              />
+
+              {/* Reports */}
+              <Route
+                path="/super-admin/reports/financial"
+                element={
+                  <ProtectedLayoutRoute>
+                    <Reports />
+                  </ProtectedLayoutRoute>
+                }
+              />
+              <Route
+                path="/super-admin/reports/schools"
+                element={
+                  <ProtectedLayoutRoute>
+                    <Reports />
+                  </ProtectedLayoutRoute>
+                }
+              />
+              <Route
+                path="/super-admin/reports/users"
+                element={
+                  <ProtectedLayoutRoute>
+                    <Reports />
                   </ProtectedLayoutRoute>
                 }
               />

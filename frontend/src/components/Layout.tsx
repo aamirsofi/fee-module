@@ -243,6 +243,11 @@ export default function Layout({ children }: LayoutProps) {
         },
       ],
     },
+    {
+      name: "Profile",
+      path: "/super-admin/profile",
+      icon: FiUser,
+    },
   ];
 
   // Check if user is super admin (define after superAdminSections)
