@@ -91,6 +91,26 @@ export class StudentsService {
         status: status as any,
         schoolId,
         userId: createStudentDto.userId || null,
+        // Route and Transport - only set if valid positive integer
+        routeId: (createStudentDto.routeId && createStudentDto.routeId > 0) ? createStudentDto.routeId : null,
+        routePlanId: (createStudentDto.routePlanId && createStudentDto.routePlanId > 0) ? createStudentDto.routePlanId : null,
+        busNumber: createStudentDto.busNumber?.trim() || null,
+        busSeatNumber: createStudentDto.busSeatNumber?.trim() || null,
+        shift: createStudentDto.shift?.trim() || null,
+        // Financial
+        openingBalance: createStudentDto.openingBalance !== undefined ? createStudentDto.openingBalance : null,
+        // Bank Account
+        bankName: createStudentDto.bankName?.trim() || null,
+        branchName: createStudentDto.branchName?.trim() || null,
+        bankIfsc: createStudentDto.bankIfsc?.trim() || null,
+        bankAccountNumber: createStudentDto.bankAccountNumber?.trim() || null,
+        // Additional
+        penNumber: createStudentDto.penNumber?.trim() || null,
+        aadharNumber: createStudentDto.aadharNumber?.trim() || null,
+        admissionFormNumber: createStudentDto.admissionFormNumber?.trim() || null,
+        whatsappNo: createStudentDto.whatsappNo?.trim() || null,
+        categoryHeadId: (createStudentDto.categoryHeadId && createStudentDto.categoryHeadId > 0) ? createStudentDto.categoryHeadId : null,
+        isSibling: createStudentDto.isSibling !== undefined ? createStudentDto.isSibling : false,
       } as Student);
       return await this.studentsRepository.save(student);
     } catch (error: any) {
@@ -179,7 +199,65 @@ export class StudentsService {
     schoolId?: number,
   ): Promise<Student> {
     const student = await this.findOne(id, schoolId);
-    Object.assign(student, updateStudentDto);
+    
+    // Validate and sanitize foreign key fields before assignment
+    const sanitizedDto: any = { ...updateStudentDto };
+    
+    // Only set foreign key fields if they are valid positive integers
+    if (sanitizedDto.routeId !== undefined) {
+      sanitizedDto.routeId = (sanitizedDto.routeId && sanitizedDto.routeId > 0) ? sanitizedDto.routeId : null;
+    }
+    
+    if (sanitizedDto.routePlanId !== undefined) {
+      sanitizedDto.routePlanId = (sanitizedDto.routePlanId && sanitizedDto.routePlanId > 0) ? sanitizedDto.routePlanId : null;
+    }
+    
+    if (sanitizedDto.categoryHeadId !== undefined) {
+      sanitizedDto.categoryHeadId = (sanitizedDto.categoryHeadId && sanitizedDto.categoryHeadId > 0) ? sanitizedDto.categoryHeadId : null;
+    }
+
+    // Handle string fields - trim if they exist
+    if (sanitizedDto.studentId !== undefined) sanitizedDto.studentId = sanitizedDto.studentId?.trim();
+    if (sanitizedDto.firstName !== undefined) sanitizedDto.firstName = sanitizedDto.firstName?.trim();
+    if (sanitizedDto.lastName !== undefined) sanitizedDto.lastName = sanitizedDto.lastName?.trim();
+    if (sanitizedDto.email !== undefined) sanitizedDto.email = sanitizedDto.email?.trim().toLowerCase();
+    if (sanitizedDto.phone !== undefined) sanitizedDto.phone = sanitizedDto.phone?.trim() || null;
+    if (sanitizedDto.address !== undefined) sanitizedDto.address = sanitizedDto.address?.trim() || null;
+    if (sanitizedDto.admissionNumber !== undefined) sanitizedDto.admissionNumber = sanitizedDto.admissionNumber?.trim() || null;
+    if (sanitizedDto.photoUrl !== undefined) sanitizedDto.photoUrl = sanitizedDto.photoUrl?.trim() || null;
+    if (sanitizedDto.parentName !== undefined) sanitizedDto.parentName = sanitizedDto.parentName?.trim() || null;
+    if (sanitizedDto.parentEmail !== undefined) sanitizedDto.parentEmail = sanitizedDto.parentEmail?.trim().toLowerCase() || null;
+    if (sanitizedDto.parentPhone !== undefined) sanitizedDto.parentPhone = sanitizedDto.parentPhone?.trim() || null;
+    if (sanitizedDto.parentRelation !== undefined) sanitizedDto.parentRelation = sanitizedDto.parentRelation?.trim() || null;
+    if (sanitizedDto.busNumber !== undefined) sanitizedDto.busNumber = sanitizedDto.busNumber?.trim() || null;
+    if (sanitizedDto.busSeatNumber !== undefined) sanitizedDto.busSeatNumber = sanitizedDto.busSeatNumber?.trim() || null;
+    if (sanitizedDto.shift !== undefined) sanitizedDto.shift = sanitizedDto.shift?.trim() || null;
+    if (sanitizedDto.bankName !== undefined) sanitizedDto.bankName = sanitizedDto.bankName?.trim() || null;
+    if (sanitizedDto.branchName !== undefined) sanitizedDto.branchName = sanitizedDto.branchName?.trim() || null;
+    if (sanitizedDto.bankIfsc !== undefined) sanitizedDto.bankIfsc = sanitizedDto.bankIfsc?.trim() || null;
+    if (sanitizedDto.bankAccountNumber !== undefined) sanitizedDto.bankAccountNumber = sanitizedDto.bankAccountNumber?.trim() || null;
+    if (sanitizedDto.penNumber !== undefined) sanitizedDto.penNumber = sanitizedDto.penNumber?.trim() || null;
+    if (sanitizedDto.aadharNumber !== undefined) sanitizedDto.aadharNumber = sanitizedDto.aadharNumber?.trim() || null;
+    if (sanitizedDto.admissionFormNumber !== undefined) sanitizedDto.admissionFormNumber = sanitizedDto.admissionFormNumber?.trim() || null;
+    if (sanitizedDto.whatsappNo !== undefined) sanitizedDto.whatsappNo = sanitizedDto.whatsappNo?.trim() || null;
+    
+    // Handle date fields
+    if (sanitizedDto.dateOfBirth !== undefined) {
+      sanitizedDto.dateOfBirth = sanitizedDto.dateOfBirth ? new Date(sanitizedDto.dateOfBirth) : null;
+    }
+    if (sanitizedDto.admissionDate !== undefined) {
+      sanitizedDto.admissionDate = sanitizedDto.admissionDate ? new Date(sanitizedDto.admissionDate) : student.admissionDate;
+    }
+    
+    // Handle openingBalance
+    if (sanitizedDto.openingBalance !== undefined) {
+      sanitizedDto.openingBalance = sanitizedDto.openingBalance !== null && sanitizedDto.openingBalance !== undefined ? sanitizedDto.openingBalance : null;
+    }
+    
+    // Debug: Log the update data
+    console.log('Updating student with data:', JSON.stringify(sanitizedDto, null, 2));
+    
+    Object.assign(student, sanitizedDto);
     return await this.studentsRepository.save(student);
   }
 

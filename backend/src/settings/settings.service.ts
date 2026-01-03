@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Setting } from './entities/setting.entity';
@@ -8,14 +8,19 @@ import { BulkUpdateSettingsDto } from './dto/bulk-update-settings.dto';
 import { TestEmailDto } from './dto/test-email.dto';
 import { TestSmsDto } from './dto/test-sms.dto';
 import { BackupService } from '../backup/backup.service';
+import { BackupSchedulerService } from '../backup/backup-scheduler.service';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class SettingsService {
+  private readonly logger = new Logger(SettingsService.name);
+
   constructor(
     @InjectRepository(Setting)
     private settingsRepository: Repository<Setting>,
     private backupService: BackupService,
+    @Inject(forwardRef(() => BackupSchedulerService))
+    private backupSchedulerService?: BackupSchedulerService,
   ) {}
 
   async findAll(): Promise<Record<string, any>> {
@@ -95,9 +100,16 @@ export class SettingsService {
 
   async bulkUpdate(bulkUpdateDto: BulkUpdateSettingsDto): Promise<Record<string, any>> {
     const updated: Record<string, any> = {};
+    let backupSettingsChanged = false;
 
     for (const [key, settingData] of Object.entries(bulkUpdateDto.settings)) {
       const value = settingData?.value;
+      
+      // Check if backup settings are being updated
+      if (key === 'autoBackupEnabled' || key === 'backupFrequency') {
+        backupSettingsChanged = true;
+      }
+      
       const setting = await this.findOne(key);
       if (setting) {
         setting.value = this.stringifyValue(value, setting.type);
@@ -127,6 +139,16 @@ export class SettingsService {
         });
         await this.settingsRepository.save(newSetting);
         updated[key] = value;
+      }
+    }
+
+    // Reschedule backup if backup settings changed
+    if (backupSettingsChanged && this.backupSchedulerService) {
+      try {
+        await this.backupSchedulerService.rescheduleBackup();
+        this.logger.log('Backup schedule updated');
+      } catch (error: any) {
+        this.logger.error(`Error rescheduling backup: ${error.message}`);
       }
     }
 
@@ -223,6 +245,21 @@ export class SettingsService {
 
   async listBackups(): Promise<Array<{ name: string; size: number; sizeFormatted: string; createdAt: Date }>> {
     return this.backupService.listBackups();
+  }
+
+  async getBackupScheduleStatus(): Promise<{
+    enabled: boolean;
+    frequency: string;
+    nextBackup: Date | null;
+  }> {
+    if (!this.backupSchedulerService) {
+      return {
+        enabled: false,
+        frequency: 'daily',
+        nextBackup: null,
+      };
+    }
+    return this.backupSchedulerService.getScheduleStatus();
   }
 
   private parseValue(value: string | null, type: string): any {

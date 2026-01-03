@@ -13,6 +13,9 @@ import { User } from '../../users/entities/user.entity';
 import { Payment } from '../../payments/entities/payment.entity';
 import { StudentFeeStructure } from '../../student-fee-structures/entities/student-fee-structure.entity';
 import { StudentAcademicRecord } from '../../student-academic-records/entities/student-academic-record.entity';
+import { Route } from '../../routes/entities/route.entity';
+import { RoutePlan } from '../../route-plans/entities/route-plan.entity';
+import { CategoryHead } from '../../category-heads/entities/category-head.entity';
 
 export enum StudentStatus {
   ACTIVE = 'active',
@@ -79,6 +82,58 @@ export class Student {
   @Column({ nullable: true, length: 255 })
   parentRelation?: string; // 'father', 'mother', 'guardian'
 
+  // Route and Transport Information
+  @Column({ nullable: true })
+  routeId?: number; // Assigned route
+
+  @Column({ nullable: true })
+  routePlanId?: number; // Assigned route plan (bus fee structure)
+
+  @Column({ nullable: true, length: 50 })
+  busNumber?: string;
+
+  @Column({ nullable: true, length: 50 })
+  busSeatNumber?: string;
+
+  @Column({ nullable: true, length: 50 })
+  shift?: string; // 'morning', 'afternoon', 'evening'
+
+  // Financial Information
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, default: 0 })
+  openingBalance?: number;
+
+  // Bank Account Information
+  @Column({ nullable: true, length: 255 })
+  bankName?: string;
+
+  @Column({ nullable: true, length: 255 })
+  branchName?: string;
+
+  @Column({ nullable: true, length: 20 })
+  bankIfsc?: string;
+
+  @Column({ nullable: true, length: 50 })
+  bankAccountNumber?: string;
+
+  // Additional Information
+  @Column({ nullable: true, length: 50 })
+  penNumber?: string;
+
+  @Column({ nullable: true, length: 20 })
+  aadharNumber?: string;
+
+  @Column({ nullable: true, length: 50 })
+  admissionFormNumber?: string;
+
+  @Column({ nullable: true, length: 20 })
+  whatsappNo?: string;
+
+  @Column({ nullable: true })
+  categoryHeadId?: number; // Fee category head assignment
+
+  @Column({ nullable: true, default: false })
+  isSibling?: boolean;
+
   // Overall Status (not year-specific)
   @Column({
     type: 'enum',
@@ -107,6 +162,18 @@ export class Student {
 
   @OneToMany(() => StudentFeeStructure, sf => sf.student)
   feeStructures!: StudentFeeStructure[];
+
+  @ManyToOne(() => Route, { nullable: true })
+  @JoinColumn({ name: 'routeId' })
+  route?: Route;
+
+  @ManyToOne(() => RoutePlan, { nullable: true })
+  @JoinColumn({ name: 'routePlanId' })
+  routePlan?: RoutePlan;
+
+  @ManyToOne(() => CategoryHead, { nullable: true })
+  @JoinColumn({ name: 'categoryHeadId' })
+  categoryHead?: CategoryHead;
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -121,8 +121,41 @@ export class StudentAcademicRecordsService {
     updateDto: UpdateStudentAcademicRecordDto,
   ): Promise<StudentAcademicRecord> {
     const record = await this.findOne(id);
+    console.log('Updating academic record:', id, 'with data:', JSON.stringify(updateDto, null, 2));
+    console.log('Current record before update:', JSON.stringify({
+      id: record.id,
+      studentId: record.studentId,
+      academicYearId: record.academicYearId,
+      classId: record.classId,
+      schoolId: record.schoolId,
+      status: record.status
+    }, null, 2));
+    
     Object.assign(record, updateDto);
-    return await this.studentAcademicRecordsRepository.save(record);
+    
+    const saved = await this.studentAcademicRecordsRepository.save(record);
+    
+    // Reload the record with relations to get the updated class
+    const updated = await this.studentAcademicRecordsRepository.findOne({
+      where: { id: saved.id },
+      relations: ['student', 'academicYear', 'class', 'feeStructures'],
+    });
+    
+    if (!updated) {
+      throw new NotFoundException(`Student academic record with ID ${id} not found after update`);
+    }
+    
+    console.log('Academic record after save and reload:', JSON.stringify({
+      id: updated.id,
+      studentId: updated.studentId,
+      academicYearId: updated.academicYearId,
+      classId: updated.classId,
+      className: updated.class?.name,
+      schoolId: updated.schoolId,
+      status: updated.status
+    }, null, 2));
+    
+    return updated;
   }
 
   async remove(id: number): Promise<void> {

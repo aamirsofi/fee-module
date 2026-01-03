@@ -46,6 +46,7 @@ import { studentAcademicRecordsService } from "../services/studentAcademicRecord
 import { academicYearsService } from "../services/academicYears.service";
 import { routeService } from "../services/routeService";
 import { feeStructuresService } from "../services/feeStructures.service";
+import { uploadService } from "../services/uploadService";
 import api from "../services/api";
 
 interface Class {
@@ -58,6 +59,7 @@ interface MultiStepStudentFormProps {
   onClose: () => void;
   onSuccess: () => void;
   editingStudent?: Student | null;
+  duplicateStudent?: Student | null;
 }
 
 interface FormData {
@@ -167,6 +169,7 @@ export default function MultiStepStudentForm({
   onClose,
   onSuccess,
   editingStudent,
+  duplicateStudent,
 }: MultiStepStudentFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -318,6 +321,8 @@ export default function MultiStepStudentForm({
     checkForDraft(); // Check for draft but don't auto-load
     if (editingStudent) {
       loadStudentData();
+    } else if (duplicateStudent) {
+      loadDuplicateStudentData();
     } else {
       // For new student, ensure admission date is set to today
       setFormData((prev) => ({ ...prev, admissionDate: getTodayDate() }));
@@ -337,7 +342,7 @@ export default function MultiStepStudentForm({
         }
       }
     }
-  }, [isOpen, editingStudent]);
+  }, [isOpen, editingStudent, duplicateStudent]);
 
   const loadDependencies = async () => {
     try {
@@ -574,6 +579,127 @@ export default function MultiStepStudentForm({
     }
   };
 
+  const loadDuplicateStudentData = async () => {
+    if (!duplicateStudent) return;
+
+    try {
+      // Load student academic record
+      const record = await studentAcademicRecordsService.getCurrent(
+        duplicateStudent.id
+      );
+
+      // Get next student ID for the duplicate
+      const urlParams = new URLSearchParams(window.location.search);
+      const schoolIdFromUrl = urlParams.get("schoolId");
+      const userStr = localStorage.getItem("user");
+      const user = userStr ? JSON.parse(userStr) : null;
+      const schoolId = schoolIdFromUrl
+        ? parseInt(schoolIdFromUrl, 10)
+        : user?.schoolId || duplicateStudent.schoolId;
+
+      let nextStudentId: number | null = null;
+      if (schoolId) {
+        try {
+          const lastIdData = await studentsService.getLastStudentId(schoolId);
+          nextStudentId = lastIdData.nextStudentId;
+        } catch (err) {
+          // Failed to load last student ID
+        }
+      }
+
+      // Format admission date if it's a Date object
+      const admissionDateStr = getTodayDate(); // Use today's date for duplicate
+
+      // Generate a unique email by appending a timestamp or number
+      const originalEmail = duplicateStudent.email || "";
+      const emailParts = originalEmail.split("@");
+      const newEmail = emailParts[0] + "+copy@" + (emailParts[1] || "example.com");
+
+      setFormData({
+        studentId: nextStudentId ? nextStudentId.toString() : "",
+        admissionDate: admissionDateStr,
+        admissionNumber: "", // Clear admission number for duplicate
+        status: "active",
+        // Map firstName + lastName to name for the form
+        name: `${duplicateStudent.firstName || ""} ${duplicateStudent.lastName || ""}`.trim(),
+        firstName: duplicateStudent.firstName || "",
+        lastName: duplicateStudent.lastName || "",
+        email: newEmail,
+        emailAddress: newEmail,
+        phone: duplicateStudent.phone || "",
+        contactNo: duplicateStudent.phone || "",
+        address: duplicateStudent.address || "",
+        dateOfBirth: duplicateStudent.dateOfBirth 
+          ? (typeof duplicateStudent.dateOfBirth === 'string' 
+            ? duplicateStudent.dateOfBirth 
+            : new Date(duplicateStudent.dateOfBirth).toISOString().split('T')[0])
+          : "",
+        gender: duplicateStudent.gender || "",
+        bloodGroup: duplicateStudent.bloodGroup || "",
+        parentName: duplicateStudent.parentName || "",
+        parentRelation: duplicateStudent.parentRelation || "",
+        parentEmail: duplicateStudent.parentEmail || "",
+        parentPhone: duplicateStudent.parentPhone || "",
+        academicYearId: record?.academicYearId.toString() || "",
+        classId: record?.classId.toString() || "",
+        section: record?.section || "",
+        rollNumber: "", // Clear roll number for duplicate
+        routeId: duplicateStudent.routeId?.toString() || "",
+        routePlanId: duplicateStudent.routePlanId?.toString() || "",
+        busFeeStructureId: duplicateStudent.routePlanId?.toString() || "",
+        openingBalance: duplicateStudent.openingBalance?.toString() || "",
+        bankAccountNumber: duplicateStudent.bankAccountNumber || "",
+        bankName: duplicateStudent.bankName || "",
+        bankIfsc: duplicateStudent.bankIfsc || "",
+        photoFile: null,
+        photoUrl: duplicateStudent.photoUrl || "",
+        // Copy additional fields
+        penNumber: duplicateStudent.penNumber || "",
+        aadharNumber: "", // Clear Aadhar number for duplicate
+        admissionFormNumber: duplicateStudent.admissionFormNumber || "",
+        whatsappNo: duplicateStudent.whatsappNo || "",
+        previousClass: "",
+        previousSchoolName: "",
+        fatherName: duplicateStudent.parentName && duplicateStudent.parentRelation === "father" ? duplicateStudent.parentName : "",
+        fatherContactNumber: duplicateStudent.parentPhone && duplicateStudent.parentRelation === "father" ? duplicateStudent.parentPhone : "",
+        fatherOccupation: "",
+        fatherQualification: "",
+        fathersMonthlyIncome: "",
+        fathersPhotoFile: null,
+        fathersPhotoUrl: "",
+        motherName: "",
+        motherContactNumber: "",
+        motherOccupation: "",
+        motherQualification: "",
+        mothersMonthlyIncome: "",
+        mothersPhotoFile: null,
+        mothersPhotoUrl: "",
+        guardianName: duplicateStudent.parentName && duplicateStudent.parentRelation === "guardian" ? duplicateStudent.parentName : "",
+        guardiansRelation: duplicateStudent.parentRelation === "guardian" ? duplicateStudent.parentRelation : "",
+        guardianMobile: duplicateStudent.parentPhone && duplicateStudent.parentRelation === "guardian" ? duplicateStudent.parentPhone : "",
+        guardianAddress: "",
+        guardianQualification: "",
+        guardianOccupation: "",
+        guardianMonthlyIncome: "",
+        guardianPhotoFile: null,
+        guardianPhotoUrl: "",
+        busId: "",
+        busNumber: duplicateStudent.busNumber || "",
+        busSeatNumber: duplicateStudent.busSeatNumber || "",
+        shift: duplicateStudent.shift || "",
+        categoryHeadId: duplicateStudent.categoryHeadId?.toString() || "",
+        isSibling: duplicateStudent.isSibling ? "yes" : "no",
+        branchName: duplicateStudent.branchName || "",
+        profileImageFile: null,
+        profileImageUrl: "",
+        attachmentsFile: null,
+        attachmentsUrl: "",
+      });
+    } catch (err) {
+      console.error("Failed to load duplicate student data:", err);
+    }
+  };
+
   const checkForDraft = () => {
     if (editingStudent) {
       setHasDraft(false);
@@ -628,17 +754,26 @@ export default function MultiStepStudentForm({
     switch (step) {
       case 1: {
         // Step 1: Essential Information - Only name, email, class, parent name, and parent contact are required
-        const step1Valid = !!(
-          formData.name &&
-          formData.name.trim().length >= 2 &&
-          formData.emailAddress &&
-          formData.emailAddress.includes("@") &&
-          formData.classId &&
-          (formData.fatherName || formData.guardianName) &&
-          (formData.fatherContactNumber || formData.guardianMobile)
-        );
+        const hasName = formData.name && formData.name.trim().length >= 2;
+        const hasEmail = formData.emailAddress && formData.emailAddress.includes("@");
+        const hasClass = formData.classId && formData.classId.trim() !== "" && parseInt(formData.classId) > 0;
+        const hasParentName = !!(formData.fatherName?.trim() || formData.guardianName?.trim() || formData.parentName?.trim());
+        const hasParentContact = !!(formData.fatherContactNumber?.trim() || formData.guardianMobile?.trim() || formData.parentPhone?.trim());
+        
+        const step1Valid = hasName && hasEmail && hasClass && hasParentName && hasParentContact;
+        
         if (!step1Valid) {
-          // Validation failed
+          // Log which field is missing for debugging
+          console.log('Validation failed:', {
+            hasName,
+            hasEmail,
+            hasClass,
+            hasParentName,
+            hasParentContact,
+            classId: formData.classId,
+            parentName: formData.fatherName || formData.guardianName || formData.parentName,
+            parentContact: formData.fatherContactNumber || formData.guardianMobile || formData.parentPhone
+          });
         }
         return step1Valid;
       }
@@ -656,7 +791,25 @@ export default function MultiStepStudentForm({
       setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
       setError("");
     } else {
-      setError("Please fill in all required fields");
+      // Provide specific error message
+      const missingFields: string[] = [];
+      if (!formData.name || formData.name.trim().length < 2) {
+        missingFields.push("Full Name");
+      }
+      if (!formData.emailAddress || !formData.emailAddress.includes("@")) {
+        missingFields.push("Email Address");
+      }
+      if (!formData.classId || formData.classId.trim() === "" || parseInt(formData.classId) <= 0) {
+        missingFields.push("Class");
+      }
+      if (!formData.fatherName?.trim() && !formData.guardianName?.trim() && !formData.parentName?.trim()) {
+        missingFields.push("Parent/Guardian Name");
+      }
+      if (!formData.fatherContactNumber?.trim() && !formData.guardianMobile?.trim() && !formData.parentPhone?.trim()) {
+        missingFields.push("Contact Number");
+      }
+      
+      setError(`Please fill in all required fields: ${missingFields.join(", ")}`);
     }
   };
 
@@ -776,7 +929,25 @@ export default function MultiStepStudentForm({
       }
 
       // Use father name as primary parent, fallback to guardian
-      const parentName = (formData.fatherName || formData.guardianName || formData.parentName)?.trim();
+      // Priority: fatherName > guardianName > parentName
+      let parentName: string | undefined;
+      let parentPhone: string | undefined;
+      let parentRelation: string | undefined;
+
+      if (formData.fatherName?.trim()) {
+        parentName = formData.fatherName.trim();
+        parentPhone = formData.fatherContactNumber?.trim() || formData.parentPhone?.trim();
+        parentRelation = formData.parentRelation?.trim() || "father";
+      } else if (formData.guardianName?.trim()) {
+        parentName = formData.guardianName.trim();
+        parentPhone = formData.guardianMobile?.trim() || formData.parentPhone?.trim();
+        parentRelation = formData.parentRelation?.trim() || formData.guardiansRelation?.trim() || "guardian";
+      } else if (formData.parentName?.trim()) {
+        parentName = formData.parentName.trim();
+        parentPhone = formData.parentPhone?.trim();
+        parentRelation = formData.parentRelation?.trim();
+      }
+
       if (parentName) {
         studentData.parentName = parentName;
       }
@@ -785,12 +956,10 @@ export default function MultiStepStudentForm({
         studentData.parentEmail = formData.parentEmail.trim().toLowerCase();
       }
 
-      const parentPhone = (formData.fatherContactNumber || formData.guardianMobile || formData.parentPhone)?.trim();
       if (parentPhone) {
         studentData.parentPhone = parentPhone;
       }
 
-      const parentRelation = formData.parentRelation?.trim() || (formData.fatherName ? "father" : formData.guardianName ? "guardian" : undefined);
       if (parentRelation) {
         studentData.parentRelation = parentRelation;
       }
@@ -804,6 +973,132 @@ export default function MultiStepStudentForm({
         studentData.photoUrl = photoUrl;
       }
 
+      // Add route and transport information
+      if (formData.routeId && formData.routeId.trim() !== "") {
+        const parsedRouteId = parseInt(formData.routeId);
+        if (!isNaN(parsedRouteId) && parsedRouteId > 0) {
+          studentData.routeId = parsedRouteId;
+        }
+      }
+
+      if (formData.busFeeStructureId && formData.busFeeStructureId.trim() !== "") {
+        const parsedRoutePlanId = parseInt(formData.busFeeStructureId);
+        if (!isNaN(parsedRoutePlanId) && parsedRoutePlanId > 0) {
+          studentData.routePlanId = parsedRoutePlanId;
+        }
+      } else if (formData.routeId && formData.routeId.trim() !== "") {
+        // Try to find a route plan for this route and class
+        const parsedRouteId = parseInt(formData.routeId);
+        if (!isNaN(parsedRouteId) && parsedRouteId > 0) {
+          try {
+            const routePlansResponse = await api.instance.get("/super-admin/route-plans", {
+              params: {
+                routeId: parsedRouteId,
+                classId: formData.classId && formData.classId.trim() !== "" ? parseInt(formData.classId) : undefined,
+                schoolId: schoolId,
+                limit: 1,
+                page: 1,
+              },
+            });
+            const routePlans = routePlansResponse.data?.data || routePlansResponse.data || [];
+            if (routePlans.length > 0 && routePlans[0].id) {
+              studentData.routePlanId = routePlans[0].id;
+            }
+          } catch (err) {
+            // Route plan lookup failed, continue without it
+          }
+        }
+      }
+
+      if (formData.busNumber?.trim()) {
+        studentData.busNumber = formData.busNumber.trim();
+      }
+
+      if (formData.busSeatNumber?.trim()) {
+        studentData.busSeatNumber = formData.busSeatNumber.trim();
+      }
+
+      if (formData.shift?.trim()) {
+        studentData.shift = formData.shift.trim();
+      }
+
+      // Add financial information
+      if (formData.openingBalance && formData.openingBalance.trim() !== "") {
+        const openingBalance = parseFloat(formData.openingBalance);
+        if (!isNaN(openingBalance)) {
+          studentData.openingBalance = openingBalance;
+        }
+      }
+
+      // Add bank account information
+      if (formData.bankName?.trim()) {
+        studentData.bankName = formData.bankName.trim();
+      }
+
+      if (formData.branchName?.trim()) {
+        studentData.branchName = formData.branchName.trim();
+      }
+
+      if (formData.bankIfsc?.trim()) {
+        studentData.bankIfsc = formData.bankIfsc.trim();
+      }
+
+      if (formData.bankAccountNumber?.trim()) {
+        studentData.bankAccountNumber = formData.bankAccountNumber.trim();
+      }
+
+      // Add additional information
+      if (formData.penNumber?.trim()) {
+        studentData.penNumber = formData.penNumber.trim();
+      }
+
+      if (formData.aadharNumber?.trim()) {
+        studentData.aadharNumber = formData.aadharNumber.trim();
+      }
+
+      if (formData.admissionFormNumber?.trim()) {
+        studentData.admissionFormNumber = formData.admissionFormNumber.trim();
+      }
+
+      if (formData.whatsappNo?.trim()) {
+        studentData.whatsappNo = formData.whatsappNo.trim();
+      }
+
+      if (formData.categoryHeadId && formData.categoryHeadId.trim() !== "") {
+        const parsedCategoryHeadId = parseInt(formData.categoryHeadId);
+        if (!isNaN(parsedCategoryHeadId) && parsedCategoryHeadId > 0) {
+          studentData.categoryHeadId = parsedCategoryHeadId;
+        }
+      }
+
+      if (formData.isSibling === "yes") {
+        studentData.isSibling = true;
+      } else if (formData.isSibling === "no") {
+        studentData.isSibling = false;
+      }
+
+      // Upload photo if a new file is selected
+      if (formData.photoFile && formData.photoFile instanceof File) {
+        try {
+          const uploadResult = await uploadService.uploadPhoto(formData.photoFile);
+          studentData.photoUrl = uploadResult.photoUrl;
+          console.log("Photo uploaded successfully:", uploadResult.photoUrl);
+        } catch (uploadError: any) {
+          const errorMessage = uploadError.response?.data?.message || "Failed to upload photo";
+          setError(errorMessage);
+          setLoading(false);
+          return;
+        }
+      } else if (formData.photoUrl && !editingStudent) {
+        // If creating new student and photoUrl exists but no new file, keep existing photoUrl
+        studentData.photoUrl = formData.photoUrl;
+      } else if (editingStudent && formData.photoUrl) {
+        // If editing and photoUrl exists (from existing student or previous upload), use it
+        studentData.photoUrl = formData.photoUrl;
+      }
+
+      // Debug: Log the student data being sent
+      console.log("Student data being sent:", JSON.stringify(studentData, null, 2));
 
       let student: Student;
 
@@ -826,41 +1121,90 @@ export default function MultiStepStudentForm({
       }
 
       // Create/Update academic record
-      if (formData.classId && formData.academicYearId) {
-        const academicRecordData = {
-          studentId: student.id,
-          academicYearId: parseInt(formData.academicYearId),
-          classId: parseInt(formData.classId),
-          schoolId: schoolId, // Add schoolId for direct queries and data integrity
-          section: formData.section?.trim() || undefined,
-          rollNumber: formData.rollNumber?.trim() || undefined,
-          status: "active" as const,
-        };
+      console.log("Form data before academic record save:", {
+        classId: formData.classId,
+        academicYearId: formData.academicYearId,
+        section: formData.section,
+        rollNumber: formData.rollNumber
+      });
+      
+      if (formData.classId && formData.classId.trim() !== "" && formData.academicYearId && formData.academicYearId.trim() !== "") {
+        const parsedClassId = parseInt(formData.classId);
+        const parsedAcademicYearId = parseInt(formData.academicYearId);
+        
+        console.log("Parsed values:", {
+          parsedClassId,
+          parsedAcademicYearId,
+          isValidClassId: !isNaN(parsedClassId) && parsedClassId > 0,
+          isValidAcademicYearId: !isNaN(parsedAcademicYearId) && parsedAcademicYearId > 0
+        });
+        
+        if (!isNaN(parsedClassId) && parsedClassId > 0 && !isNaN(parsedAcademicYearId) && parsedAcademicYearId > 0) {
+          const academicRecordData = {
+            studentId: student.id,
+            academicYearId: parsedAcademicYearId,
+            classId: parsedClassId,
+            schoolId: schoolId, // Add schoolId for direct queries and data integrity
+            section: formData.section?.trim() || undefined,
+            rollNumber: formData.rollNumber?.trim() || undefined,
+            status: "active" as const,
+          };
 
-
-        try {
-          const existingRecord = await studentAcademicRecordsService.getCurrent(
-            student.id
-          );
-          
-          if (existingRecord) {
-            await studentAcademicRecordsService.update(
-              existingRecord.id,
-              academicRecordData
+          try {
+            // Check if a record exists for this student and academic year
+            // First try to get records filtered by academic year
+            const allRecords = await studentAcademicRecordsService.getAll(student.id, parsedAcademicYearId);
+            console.log("All academic records for student:", allRecords);
+            console.log("Looking for academicYearId:", parsedAcademicYearId);
+            console.log("Academic record data to save:", academicRecordData);
+            
+            // Find record matching the academic year (should be first result if getAll filters correctly)
+            let existingRecord = allRecords.find(
+              (record) => record.academicYearId === parsedAcademicYearId
             );
-          } else {
-            await studentAcademicRecordsService.create(academicRecordData);
+            
+            // If not found, try getting all records without filter
+            if (!existingRecord) {
+              console.log("Record not found with filter, trying without filter...");
+              const allRecordsNoFilter = await studentAcademicRecordsService.getAll(student.id);
+              existingRecord = allRecordsNoFilter.find(
+                (record) => record.academicYearId === parsedAcademicYearId
+              );
+              console.log("All records without filter:", allRecordsNoFilter);
+            }
+            
+            console.log("Existing record found:", existingRecord);
+            
+            if (existingRecord && existingRecord.id) {
+              // Update existing record
+              console.log("Updating academic record ID:", existingRecord.id);
+              const updated = await studentAcademicRecordsService.update(
+                existingRecord.id,
+                academicRecordData
+              );
+              console.log("Academic record updated successfully:", updated);
+            } else {
+              // Create new record
+              console.log("Creating new academic record");
+              const created = await studentAcademicRecordsService.create(academicRecordData);
+              console.log("Academic record created successfully:", created);
+            }
+          } catch (err: any) {
+            // Show error to user but don't block form submission
+            const errorMsg = err.response?.data?.message || err.message || "Unknown error";
+            setError(`Warning: Academic record could not be saved: ${errorMsg}. Please update it manually.`);
+            console.error("Error saving academic record:", err);
+            console.error("Error details:", err.response?.data);
           }
-        } catch (err: any) {
-          // Show error to user but don't block form submission
-          setError(`Warning: Academic record could not be saved: ${err.response?.data?.message || err.message}. Please update it manually.`);
+        } else {
+          setError("Warning: Invalid Class or Academic Year. Please check your selections.");
         }
       } else {
         setError("Warning: Academic record was not created because Class or Academic Year is missing. Please update it manually.");
       }
 
-      // TODO: Save route assignment, bus fee structure, opening balance, bank account
-      // These would require additional backend endpoints
+      // All fields (route, bus fee structure, opening balance, bank account) are now saved
+      // as part of the student update above
 
       clearDraft();
       onSuccess();
@@ -942,7 +1286,7 @@ export default function MultiStepStudentForm({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>
-              {editingStudent ? "Edit Student" : "Add New Student"}
+              {editingStudent ? "Edit Student" : duplicateStudent ? "Duplicate Student" : "Add New Student"}
             </CardTitle>
             <CardDescription>
               Step {currentStep} of {STEPS.length}:{" "}
@@ -1052,6 +1396,7 @@ export default function MultiStepStudentForm({
                   key={`class-select-form-${classes.length}`}
                   value={formData.classId || undefined}
                   onValueChange={(value) => {
+                    console.log("Class changed from", formData.classId, "to", value);
                     setFormData({ ...formData, classId: value });
                   }}
                 >
@@ -1112,12 +1457,15 @@ export default function MultiStepStudentForm({
                     Parent/Guardian Name *
                   </label>
                   <Input
-                    value={formData.fatherName || formData.guardianName}
+                    value={formData.fatherName || formData.guardianName || formData.parentName || ""}
                     onChange={(e) => {
-                      if (formData.guardianName) {
-                        setFormData({ ...formData, guardianName: e.target.value });
+                      const value = e.target.value;
+                      // Update both fatherName and parentName (father takes priority)
+                      // If guardian name exists, also update guardian
+                      if (formData.guardianName && !formData.fatherName) {
+                        setFormData({ ...formData, guardianName: value, parentName: value });
                       } else {
-                        setFormData({ ...formData, fatherName: e.target.value });
+                        setFormData({ ...formData, fatherName: value, parentName: value });
                       }
                     }}
                     placeholder="Enter parent or guardian name"
@@ -1132,12 +1480,15 @@ export default function MultiStepStudentForm({
                   </label>
                   <Input
                     type="tel"
-                    value={formData.fatherContactNumber || formData.guardianMobile}
+                    value={formData.fatherContactNumber || formData.guardianMobile || formData.parentPhone || ""}
                     onChange={(e) => {
-                      if (formData.guardianMobile) {
-                        setFormData({ ...formData, guardianMobile: e.target.value });
+                      const value = e.target.value;
+                      // Update both fatherContactNumber and parentPhone (father takes priority)
+                      // If guardian mobile exists, also update guardian
+                      if (formData.guardianMobile && !formData.fatherContactNumber) {
+                        setFormData({ ...formData, guardianMobile: value, parentPhone: value });
                       } else {
-                        setFormData({ ...formData, fatherContactNumber: e.target.value });
+                        setFormData({ ...formData, fatherContactNumber: value, parentPhone: value });
                       }
                     }}
                     placeholder="10-digit mobile number"
@@ -1441,6 +1792,34 @@ export default function MultiStepStudentForm({
                         ) : (
                           <div className="px-2 py-1.5 text-sm text-muted-foreground">
                             No routes available
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Bus Fee Structure (Route Plan)
+                    </label>
+                    <Select
+                      value={formData.busFeeStructureId || undefined}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, busFeeStructureId: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select bus fee structure" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {busFeeStructures.length > 0 ? (
+                          busFeeStructures.map((fs) => (
+                            <SelectItem key={fs.id} value={fs.id.toString()}>
+                              {fs.name} - ₹{fs.amount}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No bus fee structures available
                           </div>
                         )}
                       </SelectContent>

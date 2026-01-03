@@ -99,5 +99,10 @@ export class SettingsController {
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
   }
+
+  @Get('backup/schedule/status')
+  async getBackupScheduleStatus() {
+    return this.settingsService.getBackupScheduleStatus();
+  }
 }
 

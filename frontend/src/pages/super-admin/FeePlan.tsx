@@ -33,7 +33,7 @@ import { useFeePlanData } from "../../hooks/pages/super-admin/useFeePlanData";
 import { useFeePlanImport } from "../../hooks/pages/super-admin/useFeePlanImport";
 import { useFeePlanSelection } from "../../hooks/pages/super-admin/useFeePlanSelection";
 import { useSchool } from "../../contexts/SchoolContext";
-// import { useFeePlanForm } from "../../hooks/pages/super-admin/useFeePlanForm"; // TODO: Fix circular dependency
+import { useFeePlanForm } from "../../hooks/pages/super-admin/useFeePlanForm";
 import { FeePlanDialogs } from "./components/FeePlanDialogs";
 import { FeePlanForm } from "./components/FeePlanForm";
 import { DataTable } from "@/components/DataTable";
@@ -64,28 +64,6 @@ export default function FeePlan() {
   } | null>(null);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  // Initialize form state first (needed for formSchoolId)
-  const [formData, setFormData] = useState({
-    feeCategoryId: "" as string | number,
-    categoryHeadId: "" as string | number | null,
-    amount: "",
-    classId: "" as string | number,
-    status: "active" as "active" | "inactive",
-    schoolId: "" as string | number,
-  });
-  const [createMode, setCreateMode] = useState<"single" | "multiple">("single");
-  const [selectedFeeCategoryIds, setSelectedFeeCategoryIds] = useState<
-    number[]
-  >([]);
-  const [selectedCategoryHeadIds, setSelectedCategoryHeadIds] = useState<
-    number[]
-  >([]);
-  const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
-  const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(
-    null
-  );
-  const [formResetKey, setFormResetKey] = useState(0);
-
   // Use custom hook for all data fetching
   const {
     feeStructures,
@@ -104,7 +82,35 @@ export default function FeePlan() {
     limit,
     search,
     selectedSchoolId: selectedSchoolId || "",
-    formSchoolId: formData.schoolId,
+    formSchoolId: "", // Will be updated when form hook is initialized
+  });
+
+  // Use custom hook for form functionality (after data is loaded)
+  const {
+    formData,
+    setFormData,
+    createMode,
+    setCreateMode,
+    selectedFeeCategoryIds,
+    setSelectedFeeCategoryIds,
+    selectedCategoryHeadIds,
+    setSelectedCategoryHeadIds,
+    selectedClasses,
+    setSelectedClasses,
+    editingStructure,
+    setEditingStructure,
+    formResetKey,
+    handleSubmit,
+    resetForm,
+    handleEdit,
+    handleCancel,
+  } = useFeePlanForm({
+    feeCategories,
+    categoryHeads,
+    classOptions,
+    refetchFeeStructures,
+    setError,
+    setSuccess,
   });
 
   // Use custom hook for import functionality
@@ -145,339 +151,10 @@ export default function FeePlan() {
     setSuccess,
   });
 
+  // Update formSchoolId for useFeePlanData when formData.schoolId changes
   useEffect(() => {
-    if (!formData.schoolId) {
-      setFormData((prev) => ({ ...prev, classId: "" }));
-    }
+    // This ensures categories/heads/classes are loaded for the selected school in the form
   }, [formData.schoolId]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setError("");
-      setSuccess("");
-
-      // Validate form using utility functions
-      let validation;
-      if (editingStructure) {
-        validation = validateEditForm(formData);
-      } else if (createMode === "multiple") {
-        validation = validateMultipleModeForm(
-          formData,
-          selectedFeeCategoryIds,
-          selectedClasses
-        );
-      } else {
-        validation = validateSingleModeForm(formData);
-      }
-
-      if (!validation.isValid) {
-        setError(validation.error || "Validation failed");
-        return;
-      }
-
-      // Convert schoolId to number
-      const schoolIdNum =
-        typeof formData.schoolId === "string"
-          ? parseInt(formData.schoolId, 10)
-          : formData.schoolId;
-
-      const currentSchoolId = schoolIdNum;
-
-      if (editingStructure) {
-        // Single edit mode
-        if (!formData.classId) {
-          setError("Please select a class");
-          return;
-        }
-
-        const classIdNum =
-          typeof formData.classId === "number"
-            ? formData.classId
-            : parseInt(formData.classId as string);
-
-        // Generate plan name using utility function
-        const planName = generatePlanNameFromIds(
-          parseInt(formData.feeCategoryId as string),
-          formData.categoryHeadId
-            ? parseInt(formData.categoryHeadId as string)
-            : null,
-          classIdNum,
-          feeCategories,
-          categoryHeads,
-          classOptions
-        );
-
-        interface FeePlanPayload {
-          name: string;
-          feeCategoryId: number;
-          amount: number;
-          status: "active" | "inactive";
-          categoryHeadId?: number;
-          classId?: number;
-        }
-
-        const payload: FeePlanPayload = {
-          name: planName,
-          feeCategoryId: parseInt(formData.feeCategoryId as string),
-          amount: parseFloat(formData.amount),
-          status: formData.status,
-        };
-
-        if (formData.categoryHeadId) {
-          payload.categoryHeadId = parseInt(formData.categoryHeadId as string);
-        }
-
-        if (classIdNum) {
-          payload.classId = classIdNum;
-        }
-
-        await api.instance.patch(
-          `/super-admin/fee-structures/${editingStructure.id}?schoolId=${currentSchoolId}`,
-          payload
-        );
-        setEditingStructure(null);
-        resetForm(true, currentSchoolId);
-        setSuccess("Fee plan updated successfully!");
-      } else {
-        // Create mode
-        if (createMode === "multiple") {
-          // Generate all combinations using utility function
-          const combinations = generateCombinations(
-            selectedFeeCategoryIds,
-            selectedCategoryHeadIds,
-            selectedClasses
-          );
-
-          // Check for existing fee structures to avoid duplicates
-          const existingStructuresResponse = await api.instance.get(
-            "/super-admin/fee-structures",
-            {
-              params: {
-                schoolId: currentSchoolId,
-                limit: 10000, // Get all to check duplicates
-                page: 1,
-              },
-            }
-          );
-
-          const existingStructures = Array.isArray(
-            existingStructuresResponse.data.data
-          )
-            ? existingStructuresResponse.data.data
-            : Array.isArray(existingStructuresResponse.data)
-            ? existingStructuresResponse.data
-            : [];
-
-          // Filter out duplicates using utility function
-          const newCombinations = filterDuplicates(
-            combinations,
-            existingStructures
-          );
-
-          const duplicateCount = combinations.length - newCombinations.length;
-
-          if (newCombinations.length === 0) {
-            setError(
-              `All ${combinations.length} fee plan(s) already exist. No new plans created.`
-            );
-            setTimeout(() => setError(""), 5000);
-            return;
-          }
-
-          // Create only new combinations with error handling
-          let successCount = 0;
-          let failedCount = 0;
-          const failedNames: string[] = [];
-
-          for (const combo of newCombinations) {
-            try {
-              // Generate plan name using utility function
-              const planName = generatePlanNameFromIds(
-                combo.feeCategoryId,
-                combo.categoryHeadId,
-                combo.classId,
-                feeCategories,
-                categoryHeads,
-                classOptions
-              );
-
-              interface FeePlanCreatePayload {
-                name: string;
-                feeCategoryId: number;
-                amount: number;
-                status: "active" | "inactive";
-                categoryHeadId?: number;
-                classId?: number;
-              }
-
-              const payload: FeePlanCreatePayload = {
-                name: planName,
-                feeCategoryId: combo.feeCategoryId,
-                amount: parseFloat(formData.amount),
-                status: formData.status,
-              };
-
-              if (combo.categoryHeadId) {
-                payload.categoryHeadId = combo.categoryHeadId;
-              }
-
-              if (combo.classId) {
-                payload.classId = combo.classId;
-              }
-
-              await api.instance.post(
-                `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
-                payload
-              );
-              successCount++;
-            } catch (err: unknown) {
-              failedCount++;
-              // Generate plan name using utility function
-              const planName = generatePlanNameFromIds(
-                combo.feeCategoryId,
-                combo.categoryHeadId,
-                combo.classId,
-                feeCategories,
-                categoryHeads,
-                classOptions
-              );
-
-              // Check if it's a duplicate error (400) or other error
-              const apiError = err as { response?: { status?: number } };
-              if (apiError.response?.status === 400) {
-                // Likely a duplicate, skip it
-                failedNames.push(planName);
-              } else {
-                // Other error, add to failed list
-                failedNames.push(planName);
-              }
-            }
-          }
-
-          // Build success message
-          let successMessage = "";
-          if (successCount > 0) {
-            successMessage = `Successfully created ${successCount} fee plan(s)!`;
-          }
-          if (duplicateCount > 0 || failedCount > 0) {
-            const totalSkipped = duplicateCount + failedCount;
-            if (successMessage) {
-              successMessage += ` (${totalSkipped} already existed or failed and were skipped)`;
-            } else {
-              successMessage = `All ${combinations.length} fee plan(s) already exist or failed. No new plans created.`;
-            }
-          }
-          if (successMessage) {
-            setSuccess(successMessage);
-          } else {
-            setError("Failed to create fee plans. Please try again.");
-          }
-          setSelectedFeeCategoryIds([]);
-          setSelectedCategoryHeadIds([]);
-          setSelectedClasses([]);
-        } else {
-          // Single create mode
-          const classIdNum =
-            typeof formData.classId === "number"
-              ? formData.classId
-              : parseInt(formData.classId as string);
-
-          // Generate plan name using utility function
-          const planName = generatePlanNameFromIds(
-            parseInt(formData.feeCategoryId as string),
-            formData.categoryHeadId
-              ? parseInt(formData.categoryHeadId as string)
-              : null,
-            classIdNum,
-            feeCategories,
-            categoryHeads,
-            classOptions
-          );
-
-          interface FeePlanSingleCreatePayload {
-            name: string;
-            feeCategoryId: number;
-            amount: number;
-            status: "active" | "inactive";
-            categoryHeadId?: number;
-            classId?: number;
-          }
-
-          const payload: FeePlanSingleCreatePayload = {
-            name: planName,
-            feeCategoryId: parseInt(formData.feeCategoryId as string),
-            amount: parseFloat(formData.amount),
-            status: formData.status,
-          };
-
-          if (formData.categoryHeadId) {
-            payload.categoryHeadId = parseInt(
-              formData.categoryHeadId as string
-            );
-          }
-
-          if (classIdNum) {
-            payload.classId = classIdNum;
-          }
-
-          await api.instance.post(
-            `/super-admin/fee-structures?schoolId=${currentSchoolId}`,
-            payload
-          );
-        }
-        resetForm(true, currentSchoolId);
-        setSuccess("Fee plan created successfully!");
-      }
-
-      refetchFeeStructures();
-
-      setTimeout(() => setSuccess(""), 5000);
-    } catch (err: unknown) {
-      const errorMessage = getErrorMessage(err, "Failed to save fee plan");
-      setError(errorMessage);
-      setTimeout(() => setError(""), 5000);
-    }
-  };
-
-  const resetForm = (
-    retainSchool: boolean = false,
-    schoolId?: string | number
-  ) => {
-    setFormData({
-      feeCategoryId: "" as string | number,
-      categoryHeadId: null,
-      amount: "",
-      classId: "",
-      status: "active" as "active" | "inactive",
-      schoolId: retainSchool && schoolId ? schoolId : ("" as string | number),
-    });
-    setCreateMode("single");
-    setSelectedFeeCategoryIds([]);
-    setSelectedCategoryHeadIds([]);
-    setSelectedClasses([]);
-    setError("");
-    // Don't clear success here - let the caller manage success messages
-    // Force re-render of Select components
-    setFormResetKey((prev) => prev + 1);
-  };
-
-  const handleEdit = useCallback((structure: FeeStructure) => {
-    setEditingStructure(structure);
-    // Use classId directly
-    const classId: string | number = structure.classId || "";
-
-    setFormData({
-      feeCategoryId: structure.feeCategoryId,
-      categoryHeadId: structure.categoryHeadId || null,
-      amount: structure.amount.toString(),
-      classId: classId,
-      status: structure.status,
-      schoolId: structure.schoolId,
-    });
-    setError("");
-    setSuccess("");
-  }, []);
 
   const handleDeleteClick = useCallback((id: number, schoolId: number) => {
     setDeleteItem({ id, schoolId });
@@ -504,12 +181,6 @@ export default function FeePlan() {
     }
   };
 
-  const handleCancel = () => {
-    setEditingStructure(null);
-    resetForm();
-    setError("");
-    setSuccess("");
-  };
 
   // Bulk operations are now in useFeePlanSelection hook
   const handleBulkDeleteClick = () => {

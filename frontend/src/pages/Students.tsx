@@ -18,7 +18,7 @@ import { studentAcademicRecordsService } from '../services/studentAcademicRecord
 import { useAuth } from '../contexts/AuthContext';
 import { useSchool } from '../contexts/SchoolContext';
 import { Student, AcademicYear, StudentAcademicRecord } from '../types';
-import { FiPlus, FiEdit2, FiTrash2, FiUser, FiMail, FiBook, FiLoader, FiCalendar } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiCopy, FiUser, FiMail, FiBook, FiLoader, FiCalendar } from 'react-icons/fi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -213,6 +213,15 @@ export default function Students() {
     }
   }, [user, selectedSchoolId, navigate]);
 
+  const handleDuplicate = useCallback((student: Student) => {
+    // Navigate to add page with duplicate query param
+    if (user?.role === 'super_admin' && selectedSchoolId) {
+      navigate(`/super-admin/students/new?duplicate=${student.id}&schoolId=${selectedSchoolId}`);
+    } else {
+      navigate(`/super-admin/students/new?duplicate=${student.id}`);
+    }
+  }, [user, selectedSchoolId, navigate]);
+
   const handleAddAcademicRecord = useCallback((student: Student) => {
     setSelectedStudent(student);
     setAcademicRecordData({ classId: '', section: '', rollNumber: '' });
@@ -394,6 +403,15 @@ export default function Students() {
               <FiEdit2 className="w-5 h-5" />
             </Button>
             <Button
+              onClick={() => handleDuplicate(student)}
+              variant="ghost"
+              size="icon"
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              title="Duplicate"
+            >
+              <FiCopy className="w-5 h-5" />
+            </Button>
+            <Button
               onClick={() => handleDelete(student.id)}
               variant="ghost"
               size="icon"
@@ -406,7 +424,7 @@ export default function Students() {
         );
       },
     },
-  ], [academicRecords, currentAcademicYear, handleEdit, handleDelete, handleAddAcademicRecord, getCurrentClass]);
+  ], [academicRecords, currentAcademicYear, handleEdit, handleDelete, handleDuplicate, handleAddAcademicRecord, getCurrentClass]);
 
   return (
     <Layout>

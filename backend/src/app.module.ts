@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -25,6 +26,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
 import { UserRolesModule } from './user-roles/user-roles.module';
 import { SettingsModule } from './settings/settings.module';
 import { BackupModule } from './backup/backup.module';
+import { UploadModule } from './upload/upload.module';
 import { DatabaseConfig } from './database/database.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -35,6 +37,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // Schedule module for cron jobs
+    ScheduleModule.forRoot(),
 
     // Database configuration
     TypeOrmModule.forRootAsync({
@@ -75,6 +80,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     UserRolesModule,
     SettingsModule,
     BackupModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [

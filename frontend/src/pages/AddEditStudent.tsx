@@ -18,10 +18,12 @@ export default function AddEditStudent() {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [duplicateStudent, setDuplicateStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(false);
   
   // Get schoolId from URL query params (for super admin) or from user context
   const schoolIdFromUrl = searchParams.get('schoolId');
+  const duplicateId = searchParams.get('duplicate');
   
   // Check if super admin is trying to add student without selecting school
   useEffect(() => {
@@ -38,8 +40,10 @@ export default function AddEditStudent() {
   useEffect(() => {
     if (id) {
       loadStudent();
+    } else if (duplicateId) {
+      loadStudentForDuplicate();
     }
-  }, [id]);
+  }, [id, duplicateId]);
 
   const loadStudent = async () => {
     try {
@@ -47,6 +51,19 @@ export default function AddEditStudent() {
       const student = await studentsService.getById(parseInt(id!));
       setEditingStudent(student);
     } catch (err) {
+      navigate('/super-admin/students');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStudentForDuplicate = async () => {
+    try {
+      setLoading(true);
+      const student = await studentsService.getById(parseInt(duplicateId!));
+      setDuplicateStudent(student);
+    } catch (err) {
+      console.error('Failed to load student for duplication:', err);
       navigate('/super-admin/students');
     } finally {
       setLoading(false);
@@ -61,7 +78,7 @@ export default function AddEditStudent() {
   };
 
   const handleClose = () => {
-    navigate('/students');
+    navigate('/super-admin/students');
   };
 
   if (loading) {
@@ -93,7 +110,7 @@ export default function AddEditStudent() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>{id ? 'Edit Student' : 'Add Student'}</BreadcrumbPage>
+              <BreadcrumbPage>{id ? 'Edit Student' : duplicateId ? 'Duplicate Student' : 'Add Student'}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -103,6 +120,7 @@ export default function AddEditStudent() {
           onClose={handleClose}
           onSuccess={handleSuccess}
           editingStudent={editingStudent}
+          duplicateStudent={duplicateStudent}
         />
       </div>
     </Layout>
