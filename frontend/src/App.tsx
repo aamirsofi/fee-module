@@ -22,6 +22,7 @@ import AcademicYears from "./pages/super-admin/AcademicYears";
 import Announcements from "./pages/super-admin/Announcements";
 import Analytics from "./pages/super-admin/Analytics";
 import Reports from "./pages/super-admin/Reports";
+import SystemSettings from "./pages/super-admin/SystemSettings";
 import Profile from "./pages/Profile";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ProtectedLayoutRoute from "./components/ProtectedLayoutRoute";
@@ -164,15 +165,14 @@ function App() {
               />
 
               {/* Settings - Other */}
-              {/* TODO: Add System Settings component when ready */}
-              {/* <Route
-              path="/super-admin/settings/system"
-              element={
-                <ProtectedLayoutRoute>
-                  <SystemSettings />
-                </ProtectedLayoutRoute>
-              }
-            /> */}
+              <Route
+                path="/super-admin/settings/system"
+                element={
+                  <ProtectedLayoutRoute>
+                    <SystemSettings />
+                  </ProtectedLayoutRoute>
+                }
+              />
               {/* TODO: Add Notifications component when ready */}
               {/* <Route
               path="/super-admin/settings/notifications"

@@ -23,6 +23,7 @@ import { StudentAcademicRecordsModule } from './student-academic-records/student
 import { NotificationsModule } from './notifications/notifications.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { UserRolesModule } from './user-roles/user-roles.module';
+import { SettingsModule } from './settings/settings.module';
 import { DatabaseConfig } from './database/database.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -71,6 +72,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     NotificationsModule,
     AnnouncementsModule,
     UserRolesModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [
