@@ -4,6 +4,7 @@ import {
   Body,
   Get,
   Query,
+  Param,
   UseGuards,
   Request,
   ParseIntPipe,
@@ -67,6 +68,25 @@ export class FeeGenerationController {
     }
     
     return await this.feeGenerationService.getGenerationHistory(schoolId, limit);
+  }
+
+  @Get('history/:id')
+  @Roles('super_admin', 'administrator')
+  @ApiOperation({ summary: 'Get detailed fee generation history by ID' })
+  @ApiResponse({ status: 200, description: 'Generation history details retrieved successfully' })
+  async getGenerationHistoryDetails(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Query('schoolId', new ParseIntPipe({ optional: true })) schoolIdParam?: number,
+  ) {
+    // Get schoolId from query param, request context, or user
+    const schoolId = schoolIdParam || req.school?.id || req.user.schoolId;
+    
+    if (!schoolId) {
+      throw new BadRequestException('School ID is required. Please provide schoolId as a query parameter or ensure school context is set.');
+    }
+    
+    return await this.feeGenerationService.getGenerationHistoryDetails(id, schoolId);
   }
 
   @Post('forecast')

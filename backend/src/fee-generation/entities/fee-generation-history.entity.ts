@@ -63,6 +63,21 @@ export class FeeGenerationHistory {
   @Column({ nullable: true })
   generatedBy?: string; // User email or name
 
+  @Column({ type: 'json', nullable: true })
+  feeStructureIds?: number[]; // Which fee structures were used
+
+  @Column({ type: 'json', nullable: true })
+  classIds?: number[]; // Which classes (if bulk generation)
+
+  @Column({ type: 'json', nullable: true })
+  studentIds?: number[]; // Which students (if specific generation)
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  totalAmountGenerated?: number; // Total ₹ amount generated
+
+  @Column({ type: 'json', nullable: true })
+  failedStudentDetails?: Array<{ studentId: number; studentName: string; error: string }>; // Detailed failure info
+
   @ManyToOne(() => School)
   @JoinColumn({ name: 'schoolId' })
   school!: School;

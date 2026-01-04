@@ -37,7 +37,27 @@ export interface FeeGenerationHistory {
   feesFailed: number;
   errorMessage?: string;
   generatedBy?: string;
+  feeStructureIds?: number[];
+  classIds?: number[];
+  studentIds?: number[];
+  totalAmountGenerated?: number;
+  failedStudentDetails?: Array<{ studentId: number; studentName: string; error: string }>;
   createdAt: string;
+  academicYear?: {
+    id: number;
+    name: string;
+  };
+  school?: {
+    id: number;
+    name: string;
+  };
+  feeStructures?: Array<{
+    id: number;
+    name: string;
+    amount: number;
+    category?: { name: string };
+    class?: { name: string };
+  }>;
 }
 
 const feeGenerationService = {
@@ -85,6 +105,19 @@ const feeGenerationService = {
       '/fee-generation/history',
       {
         params: { limit, ...(schoolId && { schoolId }) },
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Get detailed fee generation history by ID
+   */
+  async getHistoryDetails(id: number, schoolId?: number): Promise<FeeGenerationHistory> {
+    const response = await api.instance.get<FeeGenerationHistory>(
+      `/fee-generation/history/${id}`,
+      {
+        params: { ...(schoolId && { schoolId }) },
       },
     );
     return response.data;

@@ -94,6 +94,11 @@ export class FeeGenerationService {
       throw new BadRequestException('No students found matching the criteria');
     }
 
+    // Prepare data for history
+    const classIds = generateDto.classIds || [];
+    const studentIds = generateDto.studentIds || students.map(s => s.id);
+    const feeStructureIds = generateDto.feeStructureIds;
+
     // Create generation history record
     const history = this.generationHistoryRepository.create({
       type: GenerationType.MANUAL,
@@ -103,12 +108,17 @@ export class FeeGenerationService {
       totalStudents: students.length,
       generatedByUserId: userId,
       generatedBy: userName,
+      feeStructureIds: feeStructureIds || feeStructures.map(fs => fs.id),
+      classIds: classIds.length > 0 ? classIds : undefined,
+      studentIds: studentIds.length > 0 ? studentIds : undefined,
     });
     const savedHistory = await this.generationHistoryRepository.save(history);
 
     let generated = 0;
     let failed = 0;
+    let totalAmountGenerated = 0;
     const errors: string[] = [];
+    const failedStudentDetails: Array<{ studentId: number; studentName: string; error: string }> = [];
 
     try {
       // Process each student
@@ -125,7 +135,13 @@ export class FeeGenerationService {
 
           if (!academicRecord || !academicRecord.classId) {
             failed++;
-            errors.push(`Student ${student.firstName} ${student.lastName}: No class assigned`);
+            const errorMsg = `No class assigned`;
+            errors.push(`Student ${student.firstName} ${student.lastName}: ${errorMsg}`);
+            failedStudentDetails.push({
+              studentId: student.id,
+              studentName: `${student.firstName} ${student.lastName}`,
+              error: errorMsg,
+            });
             continue;
           }
 
@@ -201,6 +217,7 @@ export class FeeGenerationService {
 
                 await this.studentFeeStructureRepository.save(studentFeeStructure);
                 generated++;
+                totalAmountGenerated += parseFloat(installmentAmount.toString());
               }
             } else {
               // Generate single fee
@@ -223,11 +240,18 @@ export class FeeGenerationService {
 
               await this.studentFeeStructureRepository.save(studentFeeStructure);
               generated++;
+              totalAmountGenerated += finalAmount;
             }
           }
         } catch (error: any) {
           failed++;
-          errors.push(`Student ${student.firstName} ${student.lastName}: ${error.message}`);
+          const errorMsg = error.message || 'Unknown error';
+          errors.push(`Student ${student.firstName} ${student.lastName}: ${errorMsg}`);
+          failedStudentDetails.push({
+            studentId: student.id,
+            studentName: `${student.firstName} ${student.lastName}`,
+            error: errorMsg,
+          });
         }
       }
 
@@ -235,6 +259,8 @@ export class FeeGenerationService {
       savedHistory.status = GenerationStatus.COMPLETED;
       savedHistory.feesGenerated = generated;
       savedHistory.feesFailed = failed;
+      savedHistory.totalAmountGenerated = totalAmountGenerated;
+      savedHistory.failedStudentDetails = failedStudentDetails.length > 0 ? failedStudentDetails : undefined;
       if (errors.length > 0) {
         savedHistory.errorMessage = errors.slice(0, 5).join('; '); // Store first 5 errors
       }
@@ -402,6 +428,29 @@ export class FeeGenerationService {
       take: limit,
       relations: ['school', 'academicYear'],
     });
+  }
+
+  async getGenerationHistoryDetails(id: number, schoolId: number): Promise<FeeGenerationHistory> {
+    const history = await this.generationHistoryRepository.findOne({
+      where: { id, schoolId },
+      relations: ['school', 'academicYear'],
+    });
+
+    if (!history) {
+      throw new NotFoundException(`Generation history with ID ${id} not found`);
+    }
+
+    // Load fee structures if IDs are stored
+    if (history.feeStructureIds && history.feeStructureIds.length > 0) {
+      const feeStructures = await this.feeStructureRepository.find({
+        where: { id: In(history.feeStructureIds) },
+        relations: ['category', 'class'],
+      });
+      // Attach fee structures to history object (not saved to DB, just for response)
+      (history as any).feeStructures = feeStructures;
+    }
+
+    return history;
   }
 
   /**
