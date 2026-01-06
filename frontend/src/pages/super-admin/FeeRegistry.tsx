@@ -52,6 +52,7 @@ import {
   FiCheckCircle,
   FiXCircle,
   FiFileText,
+  FiDownload,
 } from "react-icons/fi";
 import {
   format,
@@ -1389,6 +1390,66 @@ export default function FeeRegistry() {
               <Icon className="w-3 h-3 mr-1" />
               {config.label}
             </Badge>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => {
+          const payment = row.original;
+          const handleDownloadPdf = async () => {
+            try {
+              const token = localStorage.getItem("access_token");
+              if (!token) {
+                alert("You must be logged in to download receipts");
+                return;
+              }
+
+              if (!selectedSchoolId) {
+                alert("School ID is required");
+                return;
+              }
+
+              const response = await fetch(
+                `http://localhost:3000/api/receipts/${payment.id}/pdf?schoolId=${selectedSchoolId}`,
+                {
+                  method: "GET",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error("Failed to download receipt");
+              }
+
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `Receipt_${payment.receiptNumber || payment.id}.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+            } catch (error) {
+              console.error("Error downloading PDF:", error);
+              alert("Failed to download receipt PDF");
+            }
+          };
+
+          return (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDownloadPdf}
+              title="Download PDF Receipt"
+            >
+              <FiDownload className="w-4 h-4 mr-1" />
+              PDF
+            </Button>
           );
         },
       },

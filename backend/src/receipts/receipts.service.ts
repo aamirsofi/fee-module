@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from '../payments/entities/payment.entity';
+import { PdfGeneratorService } from './pdf-generator.service';
 
 /**
  * Receipt Service
@@ -12,6 +13,7 @@ export class ReceiptsService {
   constructor(
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
+    private pdfGeneratorService: PdfGeneratorService,
   ) {}
 
   /**
@@ -81,5 +83,61 @@ export class ReceiptsService {
         logo: payment.school.logo,
       },
     };
+  }
+
+  /**
+   * Generate PDF receipt for a payment
+   */
+  async generatePdfReceipt(paymentId: number, schoolId: number): Promise<Buffer> {
+    const payment = await this.paymentRepository.findOne({
+      where: { id: paymentId, schoolId },
+      relations: [
+        'student',
+        'invoice',
+        'invoice.items',
+        'invoice.academicYear',
+        'school',
+      ],
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (!payment.invoiceId || !payment.invoice) {
+      throw new NotFoundException('Invoice not found for this payment');
+    }
+
+    // Prepare data for PDF generation
+    const pdfData = {
+      receiptNumber: payment.receiptNumber || `RECEIPT-${payment.id}`,
+      paymentDate: payment.paymentDate,
+      amount: Number(payment.amount),
+      paymentMethod: payment.paymentMethod,
+      transactionId: payment.transactionId || undefined,
+      student: {
+        name: `${payment.student.firstName} ${payment.student.lastName}`,
+        studentId: payment.student.studentId,
+      },
+      school: {
+        name: payment.school.name,
+        address: payment.school.address || undefined,
+        phone: payment.school.phone || undefined,
+        email: payment.school.email || undefined,
+        logoUrl: payment.school.logo || undefined,
+      },
+      items: payment.invoice.items.map(item => ({
+        description: item.description,
+        amount: Number(item.amount),
+      })),
+      invoice: {
+        invoiceNumber: payment.invoice.invoiceNumber,
+        issueDate: payment.invoice.issueDate,
+        dueDate: payment.invoice.dueDate,
+      },
+      academicYear: payment.invoice.academicYear?.name || undefined,
+    };
+
+    return this.pdfGeneratorService.generateReceipt(pdfData);
   }
 }
