@@ -463,8 +463,6 @@ export class InvoicesService {
 
     // Calculate totals from fee structures with polymorphic fields
     const items = feeStructures.map((fs) => ({
-      feeStructureId: fs.id, // Legacy
-      // NEW: Polymorphic fields
       sourceType: InvoiceSourceType.FEE,
       sourceId: fs.id,
       sourceMetadata: {

@@ -69,10 +69,8 @@ export class PaymentsService {
       relations: [
         'school', 
         'student', 
-        'studentFeeStructure',  // OLD: for backward compatibility
-        'studentFeeStructure.feeStructure',  // OLD: for backward compatibility
-        'invoice',  // NEW: invoice-based payments
-        'invoice.items',  // NEW: invoice items (fee details)
+        'invoice',
+        'invoice.items',
       ],
       order: { paymentDate: 'DESC', id: 'DESC' },
     });
@@ -88,12 +86,9 @@ export class PaymentsService {
       relations: [
         'school', 
         'student', 
-        'studentFeeStructure',  // OLD: for backward compatibility
-        'studentFeeStructure.feeStructure',  // OLD: for backward compatibility
-        'studentFeeStructure.academicYear',  // OLD: for backward compatibility
-        'invoice',  // NEW: invoice-based payments
-        'invoice.items',  // NEW: invoice items (fee details)
-        'invoice.academicYear',  // NEW: academic year info
+        'invoice',
+        'invoice.items',
+        'invoice.academicYear',
       ],
     });
 
@@ -112,11 +107,9 @@ export class PaymentsService {
     return await this.paymentsRepository.find({
       where,
       relations: [
-        'studentFeeStructure',  // OLD: for backward compatibility
-        'studentFeeStructure.feeStructure',  // OLD: for backward compatibility
-        'studentFeeStructure.academicYear',  // OLD: for backward compatibility
-        'invoice',  // NEW: invoice-based payments
-        'invoice.items',  // NEW: invoice items (shows which fees were paid)
+        'invoice',
+        'invoice.items',
+        'invoice.academicYear',
       ],
       order: { paymentDate: 'DESC', id: 'DESC' },
     });
@@ -268,8 +261,8 @@ export class PaymentsService {
       // Create payment
       const payment = queryRunner.manager.create(Payment, {
         studentId: createPaymentDto.studentId,
-        invoiceId: createPaymentDto.invoiceId, // NEW: Invoice reference
-        studentFeeStructureId: undefined, // Not used for invoice payments
+        invoiceId: createPaymentDto.invoiceId,
+        studentFeeStructureId: undefined, // Always undefined (invoice-based payments only)
         amount: createPaymentDto.amount,
         paymentDate: new Date(createPaymentDto.paymentDate),
         paymentMethod: createPaymentDto.paymentMethod || 'cash' as any,

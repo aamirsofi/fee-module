@@ -10,7 +10,6 @@ import {
 } from 'typeorm';
 import { School } from '../../schools/entities/school.entity';
 import { Student } from '../../students/entities/student.entity';
-import { StudentFeeStructure } from '../../student-fee-structures/entities/student-fee-structure.entity';
 import { FeeInvoice } from '../../invoices/entities/fee-invoice.entity';
 
 export enum PaymentMethod {
@@ -37,15 +36,13 @@ export class Payment {
   @Column()
   studentId!: number; // Keep for quick queries
 
-  // ====== PAYMENT REFERENCE (Either/Or) ======
+  // ====== PAYMENT REFERENCE ======
   
   @Column({ nullable: true })
-  studentFeeStructureId?: number; // OLD WAY: Link to student_fee_structures (legacy)
+  studentFeeStructureId?: number; // Not used - kept for database compatibility (always null)
 
   @Column({ nullable: true })
-  invoiceId?: number; // NEW WAY: Link to fee_invoices (recommended)
-  
-  // Note: Must have EITHER studentFeeStructureId OR invoiceId (enforced by DB constraint)
+  invoiceId?: number; // Link to fee_invoices (all payments use this)
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount!: number; // Payment amount (can be partial)
@@ -86,10 +83,6 @@ export class Payment {
   @ManyToOne(() => Student, student => student.payments)
   @JoinColumn({ name: 'studentId' })
   student!: Student;
-
-  @ManyToOne(() => StudentFeeStructure, studentFeeStructure => studentFeeStructure.payments, { nullable: true })
-  @JoinColumn({ name: 'studentFeeStructureId' })
-  studentFeeStructure?: StudentFeeStructure;
 
   @ManyToOne(() => FeeInvoice, invoice => invoice.payments, { nullable: true })
   @JoinColumn({ name: 'invoiceId' })

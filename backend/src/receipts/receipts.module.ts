@@ -3,10 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReceiptsService } from './receipts.service';
 import { ReceiptsController } from './receipts.controller';
 import { Payment } from '../payments/entities/payment.entity';
-import { StudentFeeStructure } from '../student-fee-structures/entities/student-fee-structure.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment, StudentFeeStructure])],
+  imports: [TypeOrmModule.forFeature([Payment])],
   controllers: [ReceiptsController],
   providers: [ReceiptsService],
   exports: [ReceiptsService],

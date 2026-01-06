@@ -33,10 +33,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/DataTable";
 import { useSchool } from "../../contexts/SchoolContext";
 import { academicYearsService } from "../../services/academicYears.service";
-import {
-  studentFeeStructuresService,
-  StudentFeeStructure,
-} from "../../services/studentFeeStructures.service";
 import { paymentsService } from "../../services/payments.service";
 import { studentsService } from "../../services/students.service";
 import {
@@ -120,9 +116,6 @@ export default function FeeRegistry() {
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
 
   // Payment related state
-  const [studentFeeStructures, setStudentFeeStructures] = useState<
-    StudentFeeStructure[]
-  >([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedFeeStructure, setSelectedFeeStructure] =
@@ -204,7 +197,6 @@ export default function FeeRegistry() {
     setError("");
     setStudentDetails(null);
     setFeeBreakdown([]);
-    setStudentFeeStructures([]);
     setPayments([]);
     setStudents([]); // Clear dropdown when searching
 
@@ -281,7 +273,6 @@ export default function FeeRegistry() {
         );
         setStudentDetails(null);
         setFeeBreakdown([]);
-        setStudentFeeStructures([]);
         setPayments([]);
         setLoadingStudent(false);
         return;
@@ -402,8 +393,8 @@ export default function FeeRegistry() {
       }
       setSearchParams(newParams, { replace: true });
 
-      // Load student fee structures and payments first (needed for accurate breakdown)
-      await loadStudentFeeStructures(studentData.id, academicYearId);
+      // Load payments for this student
+      await loadPayments(studentData.id);
 
       // Prepare student details object to pass to generateFeeBreakdown
       const studentDetailsForBreakdown: StudentDetails = {
@@ -440,7 +431,6 @@ export default function FeeRegistry() {
       );
       setStudentDetails(null);
       setFeeBreakdown([]);
-      setStudentFeeStructures([]);
       setPayments([]);
     } finally {
       setLoadingStudent(false);
@@ -558,52 +548,20 @@ export default function FeeRegistry() {
         return;
       }
 
-      // Get existing student fees and payments
-      let existingFees: any[] = [];
-      let existingPayments: any[] = [];
+      // Load existing invoices for this student
       let existingInvoices: any[] = [];
       try {
-        const existingFeesResponse = await api.instance.get(
-          "/student-fee-structures",
-          {
-            params: { studentId, academicYearId },
-          }
-        );
-        existingFees = extractArrayData<any>(existingFeesResponse);
-        console.log("Existing fees found:", existingFees);
-
-        // Load payments for this student (old system - for backward compatibility)
-        const paymentsResponse = await api.instance.get("/payments", {
-          params: { studentId },
-        });
-        existingPayments = extractArrayData<any>(paymentsResponse) || [];
-        console.log("Existing payments found:", existingPayments);
-
-        // Load invoices for this student (new system)
         const invoicesResponse = await invoicesService.getAll({
           studentId: studentId,
           schoolId: selectedSchoolId as number,
         });
         existingInvoices = Array.isArray(invoicesResponse) ? invoicesResponse : [];
-        console.log("Existing invoices found:", existingInvoices);
-        console.log("Invoice items detail:", existingInvoices.map(inv => ({
-          id: inv.id,
-          invoiceNumber: inv.invoiceNumber,
-          totalAmount: inv.totalAmount,
-          paidAmount: inv.paidAmount,
-          items: inv.items?.map((item: any) => ({
-            description: item.description,
-            amount: item.amount,
-            sourceType: item.sourceType,
-            sourceId: item.sourceId
-          }))
-        })));
       } catch (err) {
         console.warn(
-          "Failed to fetch existing fees/payments/invoices (continuing anyway):",
+          "Failed to fetch existing invoices (continuing anyway):",
           err
         );
-        // Continue without existing fees - will show balance as full amount
+        // Continue without existing invoices - will show balance as full amount
       }
 
       // Calculate months from academic year start to previous month
@@ -660,8 +618,6 @@ export default function FeeRegistry() {
               }
             }
           }
-
-          console.log(`[Ledger Balance] Opening: ₹${openingBalance}, Received: ₹${ledgerBalanceReceived}`);
 
           breakdown.push({
             feeHead:
@@ -741,24 +697,6 @@ export default function FeeRegistry() {
             }
           }
         }
-        
-        // Also include old payments (for backward compatibility)
-        const allStudentFeeStructuresForThisFee = existingFees.filter(
-          (f) => f.feeStructureId === feeStructure.id
-        );
-        if (allStudentFeeStructuresForThisFee.length > 0) {
-          const feePayments = existingPayments.filter(
-            (p) =>
-              p.studentFeeStructureId && // Only old-style payments
-              allStudentFeeStructuresForThisFee.some(
-                (sfs) => sfs.id === p.studentFeeStructureId
-              ) && p.status === "completed"
-          );
-          received += feePayments.reduce(
-            (sum, p) => sum + parseFloat(p.amount.toString()),
-            0
-          );
-        }
 
         breakdown.push({
           feeHead: feeStructure.name,
@@ -823,19 +761,6 @@ export default function FeeRegistry() {
                       }
                     );
                     
-                    console.log(`[Transport] Invoice ${invoice.invoiceNumber}:`, {
-                      totalAmount: invoice.totalAmount,
-                      paidAmount: invoice.paidAmount,
-                      itemsCount: invoice.items?.length,
-                      transportItemsFound: transportItems.length,
-                      transportItems: transportItems.map((item: any) => ({
-                        description: item.description,
-                        amount: item.amount,
-                        sourceType: item.sourceType,
-                        sourceId: item.sourceId
-                      }))
-                    });
-                    
                     if (transportItems.length > 0) {
                       const itemTotal = transportItems.reduce(
                         (sum: number, item: any) => sum + parseFloat(item.amount),
@@ -847,19 +772,10 @@ export default function FeeRegistry() {
                       const proportion = itemTotal / invoiceTotal;
                       const allocatedPayment = parseFloat(invoice.paidAmount) * proportion;
                       
-                      console.log(`[Transport] Calculated:`, {
-                        itemTotal,
-                        invoiceTotal,
-                        proportion,
-                        allocatedPayment
-                      });
-                      
                       transportReceived += allocatedPayment;
                     }
                   }
             }
-            
-            console.log(`[Transport] Total received from invoices: ₹${transportReceived}`);
 
             const busFeeAmount = parseFloat(routePrice.amount.toString());
             const monthlyAmounts: Record<string, number> = {};
@@ -934,23 +850,6 @@ export default function FeeRegistry() {
         }
       }
 
-      console.log("Fee breakdown generated:", breakdown);
-      console.log("Breakdown length:", breakdown.length);
-      console.log("=== INVOICES CHECK ===");
-      console.log("Total invoices loaded:", existingInvoices.length);
-      console.log("Invoices with items:", existingInvoices.filter(inv => inv.items && inv.items.length > 0).length);
-      console.log("=== END INVOICES CHECK ===");
-      
-      // Log each item in breakdown for debugging
-      breakdown.forEach((item, index) => {
-        console.log(`Breakdown item ${index}:`, {
-          feeHead: item.feeHead,
-          feeStructureId: item.feeStructureId,
-          total: item.total,
-          received: item.received,
-          balance: item.balance,
-        });
-      });
       setFeeBreakdown(breakdown);
     } catch (err: any) {
       console.error("Error generating fee breakdown:", err);
@@ -961,44 +860,15 @@ export default function FeeRegistry() {
     }
   };
 
-  // Generate invoice mutation removed - invoices are now automatically created during payment
-
-  // Load student fee structures for payment
-  const loadStudentFeeStructures = async (
-    studentId: number,
-    yearId: number
-  ) => {
+  // Load payments for a student
+  const loadPayments = async (studentId: number) => {
     try {
-      const fees = await studentFeeStructuresService.getAll(
-        studentId,
-        yearId,
-        selectedSchoolId as number
-      );
-      setStudentFeeStructures(fees);
-
-      // Load payments for this student
       const paymentsData = await paymentsService.getAll(studentId);
       setPayments(paymentsData);
     } catch (err: any) {
-      console.error("Error loading student fee structures:", err);
+      console.error("Error loading payments:", err);
       // Don't show error, just log it
     }
-  };
-
-  // Calculate paid amount for a fee structure
-  const getPaidAmountForFee = (feeStructureId: number): number => {
-    const studentFeeStructure = studentFeeStructures.find(
-      (sfs) => sfs.feeStructureId === feeStructureId
-    );
-    if (!studentFeeStructure) return 0;
-
-    return payments
-      .filter(
-        (p) =>
-          p.studentFeeStructureId === studentFeeStructure.id &&
-          p.status === "completed"
-      )
-      .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
   };
 
   // Calculate payment allocation based on amount received and selected fee heads
@@ -1046,36 +916,13 @@ export default function FeeRegistry() {
       });
 
     // Allocate amount to fees in priority order
-    console.log("[Allocation] Starting allocation calculation:", {
-      amountReceived,
-      selectedHeads: Array.from(selectedHeads),
-      feesToPay: feesToPay.map((f) => ({
-        feeHead: f.feeHead,
-        feeStructureId: f.feeStructureId,
-        mappedFeeId: f.mappedFeeId,
-        balance: f.balance,
-      })),
-    });
-
     for (const fee of feesToPay) {
       if (remainingAmount <= 0) break;
       const allocationAmount = Math.min(remainingAmount, fee.balance);
       // Use mappedFeeId for allocation (so Transport Fee uses -1)
       allocation[fee.mappedFeeId] = allocationAmount;
       remainingAmount -= allocationAmount;
-      console.log(
-        `[Allocation] Allocated ₹${allocationAmount} to ${fee.feeHead} (ID: ${fee.mappedFeeId}), remaining: ₹${remainingAmount}`
-      );
     }
-
-    console.log("[Allocation] Final allocation:", {
-      allocation,
-      remainingAmount,
-      totalAllocated: Object.values(allocation).reduce(
-        (sum, amt) => sum + amt,
-        0
-      ),
-    });
 
     return { allocation, remainingAmount };
   };
@@ -1274,14 +1121,6 @@ export default function FeeRegistry() {
           setRecordingPayment(false);
           return;
         }
-
-        console.log("[Payment] Starting invoice-based payment:", {
-          amountReceived: paymentFormData.amountReceived,
-          discount: paymentFormData.discount,
-          netAmount,
-          paymentAllocation,
-          selectedFeeHeads: Array.from(selectedFeeHeads),
-        });
 
         // Prepare fee allocations for invoice
         // NOTE: This now INCLUDES ledger balance (feeId = 0) if present in paymentAllocation
@@ -1495,15 +1334,6 @@ export default function FeeRegistry() {
                   ? feeNames 
                   : `${payment.invoice.items.length} fees: ${feeNames.substring(0, 30)}${feeNames.length > 30 ? '...' : ''}`
                 }
-              </span>
-            );
-          }
-          
-          // OLD: Legacy studentFeeStructure payments (backward compatibility)
-          if (payment.studentFeeStructure?.feeStructure?.name) {
-            return (
-              <span className="text-sm">
-                {payment.studentFeeStructure.feeStructure.name}
               </span>
             );
           }
@@ -1933,40 +1763,6 @@ export default function FeeRegistry() {
                     .filter((f) => {
                       // Filter out fees with zero or negative balance
                       if (f.balance <= 0) return false;
-
-                      // Double-check: Verify actual balance from student fee structures
-                      // This prevents showing fees that appear to have balance but are actually paid
-                      if (f.feeStructureId > 0) {
-                        const relevantStructures = studentFeeStructures.filter(
-                          (sfs) => sfs.feeStructureId === f.feeStructureId
-                        );
-                        if (relevantStructures.length > 0) {
-                          // Check if all installments are fully paid
-                          const allPaid = relevantStructures.every((sfs) => {
-                            const paid = payments
-                              .filter(
-                                (p) =>
-                                  p.studentFeeStructureId === sfs.id &&
-                                  p.status === "completed"
-                              )
-                              .reduce(
-                                (sum, p) =>
-                                  sum + parseFloat(p.amount.toString()),
-                                0
-                              );
-                            const balance =
-                              parseFloat(sfs.amount.toString()) - paid;
-                            return balance <= 0;
-                          });
-                          if (allPaid) {
-                            console.warn(
-                              `[Payment Form] Fee "${f.feeHead}" (ID: ${f.feeStructureId}) shows balance ${f.balance} but all installments are paid. Hiding from payment form.`
-                            );
-                            return false;
-                          }
-                        }
-                      }
-
                       return true;
                     })
                     .map((fee) => {
